@@ -29,6 +29,8 @@ export interface Property {
   isPetFriendly?: boolean;
   latitude?: number;
   longitude?: number;
+  /** Number of detail-page views; drives the Engagement weight in the ranking score. */
+  viewCount?: number;
 }
 
 export interface User {
@@ -100,6 +102,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           isPetFriendly: p.is_pet_friendly,
           latitude: p.latitude,
           longitude: p.longitude,
+          viewCount: p.view_count ?? 0,
           ownerId: p.owner_id,
           ownerName: p.owner_name,
           ownerPhone: p.owner_phone,

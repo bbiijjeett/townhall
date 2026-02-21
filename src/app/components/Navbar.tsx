@@ -1,4 +1,5 @@
-import { Home, LogOut, LayoutDashboard, Plus, User as UserIcon } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Home, LogOut, LayoutDashboard, Plus, User as UserIcon, MapPin, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Button } from './ui/button';
@@ -16,6 +17,32 @@ import { toast } from 'sonner';
 export function Navbar() {
   const { user, logout } = useApp();
   const navigate = useNavigate();
+  const [city, setCity] = useState<string | null>(null);
+  const [cityLoading, setCityLoading] = useState(false);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    setCityLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`,
+            { headers: { 'Accept-Language': 'en' } },
+          );
+          const data = await res.json();
+          const addr = data.address ?? {};
+          setCity(addr.city ?? addr.town ?? addr.village ?? addr.county ?? null);
+        } catch {
+          // silently ignore network errors
+        } finally {
+          setCityLoading(false);
+        }
+      },
+      () => setCityLoading(false), // permission denied — fail silently
+      { timeout: 8000 },
+    );
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -49,6 +76,19 @@ export function Navbar() {
           </button>
 
           <div className="flex items-center space-x-4">
+            {/* Current city */}
+            {(city || cityLoading) && (
+              <div className="hidden sm:flex items-center gap-1.5 text-sm text-gray-500">
+                {cityLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                ) : (
+                  <>
+                    <MapPin className="w-4 h-4 text-indigo-500 shrink-0" />
+                    <span className="font-medium text-gray-700">{city}</span>
+                  </>
+                )}
+              </div>
+            )}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

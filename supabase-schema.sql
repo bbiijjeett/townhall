@@ -95,3 +95,29 @@ CREATE INDEX IF NOT EXISTS idx_properties_location ON properties USING GIN (to_t
 -- Add spatial index for coordinates if needed
 CREATE INDEX IF NOT EXISTS idx_properties_coordinates ON properties (latitude, longitude);
 */
+
+-- =============================================
+-- MIGRATION: Add view_count for Engagement weight
+-- Run this against your live Supabase database.
+-- =============================================
+
+-- 1. Add the column (safe to run multiple times)
+ALTER TABLE properties
+  ADD COLUMN IF NOT EXISTS view_count INTEGER NOT NULL DEFAULT 0;
+
+-- 2. Index for fast ordering / analytics
+CREATE INDEX IF NOT EXISTS idx_properties_view_count ON properties (view_count DESC);
+
+-- 3. Increment helper – call this from your property detail page via RPC
+--    supabase.rpc('increment_property_view', { property_id: '<id>' })
+CREATE OR REPLACE FUNCTION increment_property_view(property_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE properties
+  SET view_count = view_count + 1
+  WHERE id = property_id;
+END;
+$$;

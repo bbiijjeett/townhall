@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, ArrowUpDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { computeListingScore } from '../../lib/rankingScore';
 import { useApp } from '../context/AppContext';
 import { PropertyCard } from '../components/PropertyCard';
 import { FilterBar, FilterOptions } from '../components/FilterBar';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
-import heroBg from '../../assets/hero.avif';
+import heroBg from '../../assets/hero.png';
 
 export function LandingPage() {
   const navigate = useNavigate();
@@ -16,13 +17,12 @@ export function LandingPage() {
   const [filters, setFilters] = useState<FilterOptions>({
     bhk: [],
     rentRange: [0, 25000],
-    locations: [],
+    furnishing: [],
+    amenities: [],
   });
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'recommended' | 'newest' | 'price_asc' | 'price_desc'>('recommended');
 
-  const availableLocations = useMemo(() => {
-    return Array.from(new Set(properties.map(p => p.location)));
-  }, [properties]);
 
   const filteredProperties = useMemo(() => {
     return properties.filter(property => {
@@ -45,8 +45,13 @@ export function LandingPage() {
         return false;
       }
 
-      // Location filter
-      if (filters.locations.length > 0 && !filters.locations.includes(property.location)) {
+      // Furnishing filter
+      if (filters.furnishing.length > 0 && (!property.furnishing || !filters.furnishing.includes(property.furnishing))) {
+        return false;
+      }
+
+      // Amenities filter — property must include ALL selected amenities
+      if (filters.amenities.length > 0 && !filters.amenities.every(a => property.amenities.includes(a))) {
         return false;
       }
 
@@ -57,8 +62,15 @@ export function LandingPage() {
       if (selectedCategory === 'Under ₹15k' && property.rent >= 15000) return false;
 
       return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'recommended') return computeListingScore(b) - computeListingScore(a);
+      if (sortBy === 'newest') return b.createdAt.getTime() - a.createdAt.getTime();
+      if (sortBy === 'price_asc') return a.rent - b.rent;
+      if (sortBy === 'price_desc') return b.rent - a.rent;
+      return 0;
     });
-  }, [properties, searchQuery, filters, selectedCategory]);
+  }, [properties, searchQuery, filters, selectedCategory, sortBy]);
 
   const categories = [
     { label: '1BHK', value: '1BHK' },
@@ -132,16 +144,27 @@ export function LandingPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        <FilterBar
-          onFilterChange={setFilters}
-          availableLocations={availableLocations}
-        />
+        <FilterBar onFilterChange={setFilters} />
 
-        {/* Results Count */}
-        <div className="mt-6 mb-4">
+        {/* Results Count + Sort */}
+        <div className="mt-6 mb-4 flex items-center justify-between gap-3 flex-wrap">
           <p className="text-gray-600">
             {filteredProperties.length} {filteredProperties.length === 1 ? 'property' : 'properties'} found
           </p>
+
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="w-4 h-4 text-gray-400 shrink-0" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="recommended">Recommended</option>
+              <option value="newest">Newest</option>
+              <option value="price_asc">Price: Low → High</option>
+              <option value="price_desc">Price: High → Low</option>
+            </select>
+          </div>
         </div>
 
         {/* Property Grid */}
@@ -163,7 +186,7 @@ export function LandingPage() {
               className="mt-4"
               onClick={() => {
                 setSearchQuery('');
-                setFilters({ bhk: [], rentRange: [0, 25000], locations: [] });
+                setFilters({ bhk: [], rentRange: [0, 25000], furnishing: [], amenities: [] });
                 setSelectedCategory(null);
               }}
             >

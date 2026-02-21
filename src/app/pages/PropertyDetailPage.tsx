@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MapPin, BedDouble, IndianRupee, Phone, MessageCircle, CheckCircle2, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { supabase } from '../../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -23,6 +24,18 @@ export function PropertyDetailPage() {
   const [enquiryName, setEnquiryName] = useState('');
   const [enquiryPhone, setEnquiryPhone] = useState('');
   const [enquiryMessage, setEnquiryMessage] = useState('');
+
+  // Increment view count once per page load (drives Engagement weight in ranking)
+  useEffect(() => {
+    if (!propertyId) return;
+    (async () => {
+      try {
+        await supabase.rpc('increment_property_view', { property_id: propertyId });
+      } catch (err) {
+        console.warn('Could not increment view count:', err);
+      }
+    })();
+  }, [propertyId]);
 
   if (!property) {
     return (
