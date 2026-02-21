@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Home, Mail, Phone, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
 
 export function Footer() {
@@ -11,7 +12,7 @@ export function Footer() {
           <div>
             <div className="flex items-center space-x-2 mb-4">
               <Home className="w-6 h-6 text-indigo-400" />
-              <span className="text-xl font-semibold text-white">TownRent</span>
+              <span className="text-xl font-semibold text-white">RoingRent</span>
             </div>
             <p className="text-sm text-gray-400 mb-4">
               Find your perfect rental home with no broker fees. Direct contact with verified property owners.
@@ -51,11 +52,11 @@ export function Footer() {
                   Filter by Budget
                 </a>
               </li>
-              <li>
+              {/* <li>
                 <a href="#" className="text-sm hover:text-indigo-400 transition-colors">
                   How it Works
                 </a>
-              </li>
+              </li> */}
             </ul>
           </div>
 
@@ -64,11 +65,11 @@ export function Footer() {
             <h3 className="text-white font-semibold mb-4">For Owners</h3>
             <ul className="space-y-2">
               <li>
-                <a href="#" className="text-sm hover:text-indigo-400 transition-colors">
+                <a href="/add-property" className="text-sm hover:text-indigo-400 transition-colors">
                   Post Property
                 </a>
               </li>
-              <li>
+              {/* <li>
                 <a href="#" className="text-sm hover:text-indigo-400 transition-colors">
                   Pricing Plans
                 </a>
@@ -77,7 +78,7 @@ export function Footer() {
                 <a href="#" className="text-sm hover:text-indigo-400 transition-colors">
                   Owner Dashboard
                 </a>
-              </li>
+              </li> */}
               <li>
                 <a href="#" className="text-sm hover:text-indigo-400 transition-colors">
                   FAQ
@@ -92,14 +93,14 @@ export function Footer() {
             <ul className="space-y-3">
               <li className="flex items-center text-sm">
                 <Mail className="w-4 h-4 mr-2 text-indigo-400" />
-                <a href="mailto:support@townrent.com" className="hover:text-indigo-400 transition-colors">
-                  support@townrent.com
+                <a href="mailto:xxxxxxxxxxx" className="hover:text-indigo-400 transition-colors">
+                  xxxxxxxxxxx
                 </a>
               </li>
               <li className="flex items-center text-sm">
                 <Phone className="w-4 h-4 mr-2 text-indigo-400" />
-                <a href="tel:+919876543210" className="hover:text-indigo-400 transition-colors">
-                  +91 98765 43210
+                <a href="tel:+91xxxxxxxxxxx" className="hover:text-indigo-400 transition-colors">
+                  +91 xxxxx xxxxx
                 </a>
               </li>
             </ul>
@@ -115,21 +116,18 @@ export function Footer() {
         <div className="border-t border-gray-800 pt-8">
           <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
             <p className="text-sm text-gray-400">
-              © {currentYear} TownRent. All rights reserved.
+              © {currentYear} RoingRent. All rights reserved.
             </p>
             <div className="flex flex-wrap justify-center gap-6 text-sm">
-              <a href="#" className="text-gray-400 hover:text-indigo-400 transition-colors">
+              <Link to="/privacy-policy" className="text-gray-400 hover:text-indigo-400 transition-colors">
                 Privacy Policy
-              </a>
-              <a href="#" className="text-gray-400 hover:text-indigo-400 transition-colors">
+              </Link>
+              <Link to="/terms-of-service" className="text-gray-400 hover:text-indigo-400 transition-colors">
                 Terms of Service
-              </a>
-              <a href="#" className="text-gray-400 hover:text-indigo-400 transition-colors">
+              </Link>
+              <Link to="/cookie-policy" className="text-gray-400 hover:text-indigo-400 transition-colors">
                 Cookie Policy
-              </a>
-              <a href="#" className="text-gray-400 hover:text-indigo-400 transition-colors">
-                Sitemap
-              </a>
+              </Link>
             </div>
           </div>
         </div>

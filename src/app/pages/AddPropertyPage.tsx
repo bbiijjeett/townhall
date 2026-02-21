@@ -10,6 +10,7 @@ import { Card } from '../components/ui/card';
 import { Checkbox } from '../components/ui/checkbox';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { PropertyPreview } from '../components/PropertyPreview';
+import { LocationPicker } from '../components/LocationPicker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { toast } from 'sonner';
 
@@ -32,6 +33,7 @@ interface PropertyFormData {
   description: string;
   imageUrls: string[];
   amenities: string[];
+  ownerName: string;
   phoneNumber: string;
   area: string;
   floor: string;
@@ -74,6 +76,7 @@ export function AddPropertyPage() {
     description: '',
     imageUrls: [],
     amenities: [],
+    ownerName: user?.name || '',
     phoneNumber: user?.phone || '',
     area: '',
     floor: '',
@@ -129,7 +132,7 @@ export function AddPropertyPage() {
           resourceType: 'image',
           clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
           maxFileSize: 5000000, // 5MB
-          folder: `townrent/${user?.id}`,
+          folder: `roingrent/${user?.id}`,
         },
         (error: any, result: any) => {
           if (!error && result && result.event === 'success') {
@@ -183,6 +186,10 @@ export function AddPropertyPage() {
       case 1:
         if (!formData.title.trim()) {
           toast.error('Please enter a property title');
+          return false;
+        }
+        if (!formData.ownerName.trim()) {
+          toast.error('Please provide the owner name');
           return false;
         }
         if (!formData.phoneNumber || formData.phoneNumber.length < 10) {
@@ -276,6 +283,7 @@ export function AddPropertyPage() {
         description: formData.description.trim(),
         images: formData.imageUrls,
         amenities: formData.amenities,
+        ownerName: formData.ownerName.trim(),
         ownerPhone: formData.phoneNumber.trim(),
         area: formData.area ? Number(formData.area) : undefined,
         floor: formData.floor ? Number(formData.floor) : undefined,
@@ -394,6 +402,18 @@ export function AddPropertyPage() {
             </div>
 
             <div>
+              <Label htmlFor="ownerName">Owner Name *</Label>
+              <Input
+                id="ownerName"
+                type="text"
+                value={formData.ownerName}
+                onChange={(e) => updateField('ownerName', e.target.value)}
+                placeholder="Enter your full name"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
               <Label htmlFor="phone">Contact Number *</Label>
               <Input
                 id="phone"
@@ -482,6 +502,25 @@ export function AddPropertyPage() {
                 onChange={(e) => updateField('city', e.target.value)}
                 placeholder="e.g., Bangalore, Mumbai, Delhi"
                 className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label>Pin Location on Map (Optional)</Label>
+              <p className="text-xs text-gray-500 mb-2">Helps tenants find the exact location</p>
+              <LocationPicker
+                searchQuery={[
+                  formData.street1,
+                  formData.street2,
+                  formData.nearby,
+                  formData.city,
+                ].filter(Boolean).join(', ')}
+                latitude={formData.latitude}
+                longitude={formData.longitude}
+                onChange={(lat, lng) => {
+                  updateField('latitude', lat || undefined);
+                  updateField('longitude', lng || undefined);
+                }}
               />
             </div>
 

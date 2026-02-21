@@ -29,7 +29,8 @@ export function PaymentPage() {
     );
   }
 
-  const listingFee = 199;
+  const listingFee = 999;
+  const effectiveFee = 0; // Testing phase — free listing
 
   const handlePayment = async () => {
     try {
@@ -74,11 +75,13 @@ export function PaymentPage() {
             <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-6 border border-indigo-100">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <p className="text-gray-700 mb-1">30 Days Premium Listing</p>
+                  <p className="text-gray-700 mb-1">45 Days Premium Listing</p>
                   <p className="text-sm text-gray-600">Get maximum visibility for your property</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-3xl font-bold text-gray-900">₹{listingFee}</p>
+                  <p className="text-lg line-through text-gray-400">₹{listingFee}</p>
+                  <p className="text-3xl font-bold text-green-600">FREE</p>
+                  <p className="text-xs text-gray-500">Testing phase</p>
                 </div>
               </div>
 
@@ -97,28 +100,20 @@ export function PaymentPage() {
                 </div>
                 <div className="flex items-center">
                   <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-                  <span>30 Days Active Listing</span>
+                  <span>45 Days Active Listing</span>
                 </div>
               </div>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-gray-700">Listing Fee</span>
-                <span className="font-semibold text-gray-900">₹{listingFee}</span>
-              </div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-gray-700">GST (18%)</span>
-                <span className="font-semibold text-gray-900">₹{Math.round(listingFee * 0.18)}</span>
-              </div>
-              <div className="border-t border-gray-300 pt-2 mt-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-semibold text-gray-900">Total Amount</span>
-                  <span className="text-2xl font-bold text-indigo-600">
-                    ₹{Math.round(listingFee * 1.18)}
-                  </span>
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-semibold text-gray-900">Total Amount</span>
+                <div className="text-right">
+                  <span className="text-sm line-through text-gray-400 mr-2">₹{listingFee}</span>
+                  <span className="text-2xl font-bold text-green-600">₹{effectiveFee}</span>
                 </div>
               </div>
+              <p className="text-xs text-gray-500 mt-1">Free during testing phase</p>
             </div>
           </div>
 
@@ -133,10 +128,10 @@ export function PaymentPage() {
             </Button>
             <Button
               onClick={() => setShowPaymentModal(true)}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+              className="flex-1 bg-green-600 hover:bg-green-700"
             >
-              <IndianRupee className="w-4 h-4 mr-2" />
-              Pay Now
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Claim Now
             </Button>
           </div>
         </Card>
@@ -148,81 +143,52 @@ export function PaymentPage() {
           <div className="p-4">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Select Payment Method</h2>
 
-            <div className="space-y-3 mb-6">
-              <Card
-                className={`p-4 cursor-pointer transition-all ${
-                  paymentMethod === 'card' ? 'border-indigo-600 bg-indigo-50' : 'hover:bg-gray-50'
-                }`}
-                onClick={() => setPaymentMethod('card')}
-              >
+            {/* Payment methods disabled during free/testing phase */}
+            <div className="space-y-3 mb-6 opacity-40 pointer-events-none select-none">
+              <Card className="p-4">
                 <div className="flex items-center">
-                  <CreditCard className="w-6 h-6 text-indigo-600 mr-3" />
+                  <CreditCard className="w-6 h-6 text-gray-400 mr-3" />
                   <div className="flex-1">
-                    <p className="font-semibold text-gray-900">Credit / Debit Card</p>
-                    <p className="text-sm text-gray-600">Pay using your card</p>
+                    <p className="font-semibold text-gray-500">Credit / Debit Card</p>
+                    <p className="text-sm text-gray-400">Pay using your card</p>
                   </div>
-                  <div className={`w-5 h-5 rounded-full border-2 ${
-                    paymentMethod === 'card' ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'
-                  }`}>
-                    {paymentMethod === 'card' && (
-                      <CheckCircle className="w-4 h-4 text-white" />
-                    )}
-                  </div>
+                  <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
                 </div>
               </Card>
 
-              <Card
-                className={`p-4 cursor-pointer transition-all ${
-                  paymentMethod === 'upi' ? 'border-indigo-600 bg-indigo-50' : 'hover:bg-gray-50'
-                }`}
-                onClick={() => setPaymentMethod('upi')}
-              >
+              <Card className="p-4">
                 <div className="flex items-center">
-                  <IndianRupee className="w-6 h-6 text-indigo-600 mr-3" />
+                  <IndianRupee className="w-6 h-6 text-gray-400 mr-3" />
                   <div className="flex-1">
-                    <p className="font-semibold text-gray-900">UPI</p>
-                    <p className="text-sm text-gray-600">Pay using UPI apps</p>
+                    <p className="font-semibold text-gray-500">UPI</p>
+                    <p className="text-sm text-gray-400">Pay using UPI apps</p>
                   </div>
-                  <div className={`w-5 h-5 rounded-full border-2 ${
-                    paymentMethod === 'upi' ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'
-                  }`}>
-                    {paymentMethod === 'upi' && (
-                      <CheckCircle className="w-4 h-4 text-white" />
-                    )}
-                  </div>
+                  <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
                 </div>
               </Card>
 
-              <Card
-                className={`p-4 cursor-pointer transition-all ${
-                  paymentMethod === 'netbanking' ? 'border-indigo-600 bg-indigo-50' : 'hover:bg-gray-50'
-                }`}
-                onClick={() => setPaymentMethod('netbanking')}
-              >
+              <Card className="p-4">
                 <div className="flex items-center">
-                  <Building2 className="w-6 h-6 text-indigo-600 mr-3" />
+                  <Building2 className="w-6 h-6 text-gray-400 mr-3" />
                   <div className="flex-1">
-                    <p className="font-semibold text-gray-900">Net Banking</p>
-                    <p className="text-sm text-gray-600">Pay using internet banking</p>
+                    <p className="font-semibold text-gray-500">Net Banking</p>
+                    <p className="text-sm text-gray-400">Pay using internet banking</p>
                   </div>
-                  <div className={`w-5 h-5 rounded-full border-2 ${
-                    paymentMethod === 'netbanking' ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'
-                  }`}>
-                    {paymentMethod === 'netbanking' && (
-                      <CheckCircle className="w-4 h-4 text-white" />
-                    )}
-                  </div>
+                  <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
                 </div>
               </Card>
             </div>
+            <p className="text-xs text-center text-gray-400 -mt-3 mb-6">Payment not required during testing phase</p>
 
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
               <div className="flex justify-between items-center">
                 <span className="text-gray-700">Amount to Pay</span>
-                <span className="text-2xl font-bold text-indigo-600">
-                  ₹{Math.round(listingFee * 1.18)}
-                </span>
+                <div className="text-right">
+                  <span className="text-sm line-through text-gray-400 mr-2">₹{listingFee}</span>
+                  <span className="text-2xl font-bold text-green-600">FREE</span>
+                </div>
               </div>
+              <p className="text-xs text-gray-500 mt-1">Free during testing phase</p>
             </div>
 
             <div className="flex gap-3">
@@ -237,7 +203,7 @@ export function PaymentPage() {
                 onClick={handlePayment}
                 className="flex-1 bg-green-600 hover:bg-green-700"
               >
-                Pay ₹{Math.round(listingFee * 1.18)}
+                Claim Free Listing
               </Button>
             </div>
           </div>
@@ -251,7 +217,7 @@ export function PaymentPage() {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Listing Successful!</h2>
             <p className="text-gray-600 mb-6">
               Your property is now live and visible to potential tenants.
             </p>

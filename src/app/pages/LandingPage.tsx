@@ -7,7 +7,7 @@ import { FilterBar, FilterOptions } from '../components/FilterBar';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
-import heroBg from '../../assets/hero_land.avif';
+import heroBg from '../../assets/hero.avif';
 
 export function LandingPage() {
   const navigate = useNavigate();

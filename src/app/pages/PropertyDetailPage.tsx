@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MapPin, BedDouble, IndianRupee, Phone, MessageCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MapPin, BedDouble, IndianRupee, Phone, MessageCircle, CheckCircle2, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Button } from '../components/ui/button';
@@ -83,6 +83,25 @@ export function PropertyDetailPage() {
     // Open WhatsApp with the formatted number
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
     window.open(whatsappUrl, '_blank');
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const shareData = {
+      title: property?.title ?? 'Check out this property',
+      text: `${property?.title} - ₹${property?.rent.toLocaleString()}/month at ${property?.location}`,
+      url,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        // user cancelled
+      }
+    } else {
+      await navigator.clipboard.writeText(url);
+      toast.success('Link copied to clipboard!');
+    }
   };
 
   const handleSubmitEnquiry = (e: React.FormEvent) => {
@@ -203,16 +222,29 @@ export function PropertyDetailPage() {
                 </div>
               </Card>
 
-              {/* Map Placeholder */}
+              {/* Map */}
               <Card className="p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Location</h2>
-                <div className="bg-gray-200 h-64 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600">Map view coming soon</p>
-                    <p className="text-sm text-gray-500 mt-1">{property.location}</p>
-                  </div>
+                <div className="rounded-lg overflow-hidden h-64">
+                  <iframe
+                    title="Property Location"
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    allowFullScreen
+                    referrerPolicy="no-referrer-when-downgrade"
+                    src={
+                      property.latitude && property.longitude
+                        ? `https://maps.google.com/maps?q=${property.latitude},${property.longitude}&output=embed`
+                        : `https://maps.google.com/maps?q=${encodeURIComponent(property.location)}&output=embed`
+                    }
+                  />
                 </div>
+                <p className="text-sm text-gray-500 mt-2 flex items-center">
+                  <MapPin className="w-4 h-4 mr-1" />
+                  {property.location}
+                </p>
               </Card>
             </div>
 
@@ -264,13 +296,23 @@ export function PropertyDetailPage() {
                     WhatsApp Owner
                   </Button>
                   
-                  <Button
+                  {/* <Button
                     onClick={handleContactOwner}
                     variant="outline"
                     className="w-full border-indigo-600 text-indigo-600 hover:bg-indigo-50"
                   >
                     <MessageCircle className="w-4 h-4 mr-2" />
                     Send Enquiry
+                  </Button> */}
+
+                  {/* Share Button */}
+                  <Button
+                    onClick={handleShare}
+                    variant="outline"
+                    className="w-full border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Share Property
                   </Button>
                 </div>
 
@@ -285,6 +327,8 @@ export function PropertyDetailPage() {
                   </div>
                 </div>
               </Card>
+
+              
             </div>
           </div>
         </div>

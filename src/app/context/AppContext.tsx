@@ -56,7 +56,7 @@ interface AppContextType {
   properties: Property[];
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-  addProperty: (property: Omit<Property, 'id' | 'ownerId' | 'ownerName' | 'status' | 'paymentStatus' | 'createdAt' | 'expiresAt'>) => Promise<string>;
+  addProperty: (property: Omit<Property, 'id' | 'ownerId' | 'status' | 'paymentStatus' | 'createdAt' | 'expiresAt'>) => Promise<string>;
   updatePropertyPayment: (propertyId: string) => Promise<void>;
   deleteProperty: (propertyId: string) => Promise<void>;
   getUserProperties: () => Property[];
@@ -149,7 +149,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const addProperty = async (property: Omit<Property, 'id' | 'ownerId' | 'ownerName' | 'status' | 'paymentStatus' | 'createdAt' | 'expiresAt'>) => {
+  const addProperty = async (property: Omit<Property, 'id' | 'ownerId' | 'status' | 'paymentStatus' | 'createdAt' | 'expiresAt'>) => {
     if (!user) throw new Error('User must be logged in to add property');
     
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -175,7 +175,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         latitude: property.latitude,
         longitude: property.longitude,
         owner_id: user.id,
-        owner_name: user.name,
+        owner_name: property.ownerName || user.name,
         owner_phone: property.ownerPhone,
         status: 'pending',
         payment_status: 'pending',

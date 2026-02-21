@@ -45,7 +45,7 @@ export function Navbar() {
             className="flex items-center space-x-2"
           >
             <Home className="w-6 h-6 text-indigo-600" />
-            <span className="text-xl font-semibold text-gray-900">TownRent</span>
+            <span className="text-xl font-semibold text-gray-900">RoingRent</span>
           </button>
 
           <div className="flex items-center space-x-4">
