@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Upload, X, Check, MapPin, Eye, Save, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { supabase } from '../../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -13,13 +14,6 @@ import { PropertyPreview } from '../components/PropertyPreview';
 import { LocationPicker } from '../components/LocationPicker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { toast } from 'sonner';
-
-// Cloudinary widget types
-declare global {
-  interface Window {
-    cloudinary?: any;
-  }
-}
 
 interface PropertyFormData {
   title: string;
@@ -34,7 +28,6 @@ interface PropertyFormData {
   imageUrls: string[];
   amenities: string[];
   ownerName: string;
-  phoneNumber: string;
   area: string;
   floor: string;
   totalFloors: string;
@@ -63,6 +56,8 @@ export function AddPropertyPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState<PropertyFormData>({
     title: '',
@@ -77,8 +72,7 @@ export function AddPropertyPage() {
     imageUrls: [],
     amenities: [],
     ownerName: user?.name || '',
-    phoneNumber: user?.phone || '',
-    area: '',
+    area: ''
     floor: '',
     totalFloors: '',
     availableFrom: new Date().toISOString().split('T')[0],
@@ -111,49 +105,76 @@ export function AddPropertyPage() {
     return () => clearTimeout(timer);
   }, [formData]);
 
-  // Cloudinary upload widget
-  const openCloudinaryWidget = () => {
-    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+  // Signed Cloudinary upload — API secret stays server-side
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    const folder = `townhall/${user!.id}`;
 
-    if (!cloudName || !uploadPreset) {
-      toast.error('Cloudinary not configured. Please add images via URL.');
+    // 1. Get a short-lived signature from our Edge Function
+    const { data: sigData, error: sigError } = await supabase.functions.invoke(
+      'sign-upload',
+      { body: { folder } },
+    );
+    if (sigError || !sigData?.data) throw new Error('Could not get upload signature');
+
+    const { signature, timestamp, api_key, cloud_name } = sigData.data;
+
+    // 2. POST the file directly to Cloudinary (no secret in browser)
+    const form = new FormData();
+    form.append('file', file);
+    form.append('api_key', api_key);
+    form.append('timestamp', String(timestamp));
+    form.append('signature', signature);
+    form.append('folder', folder);
+
+    const res  = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`,
+      { method: 'POST', body: form },
+    );
+    const json = await res.json();
+
+    if (!res.ok || !json.secure_url) {
+      throw new Error(json.error?.message ?? 'Upload failed');
+    }
+    return json.secure_url as string;
+  };
+
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+
+    const remaining = 10 - formData.imageUrls.length;
+    if (remaining <= 0) {
+      toast.error('Maximum 10 photos allowed');
       return;
     }
 
-    if (window.cloudinary) {
-      window.cloudinary.openUploadWidget(
-        {
-          cloudName,
-          uploadPreset,
-          sources: ['local', 'camera', 'url'],
-          multiple: true,
-          maxFiles: 10,
-          resourceType: 'image',
-          clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
-          maxFileSize: 5000000, // 5MB
-          folder: `roingrent/${user?.id}`,
-        },
-        (error: any, result: any) => {
-          if (!error && result && result.event === 'success') {
-            setFormData(prev => ({
-              ...prev,
-              imageUrls: [...prev.imageUrls, result.info.secure_url],
-            }));
-            toast.success('Image uploaded successfully!');
-          } else if (error) {
-            toast.error('Upload failed: ' + error.message);
-          }
-        }
-      );
-    } else {
-      // Load Cloudinary widget script
-      const script = document.createElement('script');
-      script.src = 'https://upload-widget.cloudinary.com/global/all.js';
-      script.async = true;
-      document.head.appendChild(script);
-      script.onload = () => openCloudinaryWidget();
+    const toUpload = files.slice(0, remaining);
+
+    setIsUploading(true);
+    let uploaded = 0;
+
+    for (const file of toUpload) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} exceeds 5 MB limit — skipped`);
+        continue;
+      }
+      try {
+        const url = await uploadToCloudinary(file);
+        setFormData(prev => ({ ...prev, imageUrls: [...prev.imageUrls, url] }));
+        uploaded++;
+      } catch (err) {
+        toast.error(
+          `Failed to upload ${file.name}: ${
+            err instanceof Error ? err.message : 'Unknown error'
+          }`,
+        );
+      }
     }
+
+    if (uploaded > 0) toast.success(`${uploaded} photo${uploaded > 1 ? 's' : ''} uploaded`);
+    setIsUploading(false);
+    // Reset input so the same file can be re-selected if needed
+    e.target.value = '';
   };
 
   const availableAmenities = [
@@ -190,10 +211,6 @@ export function AddPropertyPage() {
         }
         if (!formData.ownerName.trim()) {
           toast.error('Please provide the owner name');
-          return false;
-        }
-        if (!formData.phoneNumber || formData.phoneNumber.length < 10) {
-          toast.error('Please provide a valid contact number');
           return false;
         }
         return true;
@@ -284,7 +301,6 @@ export function AddPropertyPage() {
         images: formData.imageUrls,
         amenities: formData.amenities,
         ownerName: formData.ownerName.trim(),
-        ownerPhone: formData.phoneNumber.trim(),
         area: formData.area ? Number(formData.area) : undefined,
         floor: formData.floor ? Number(formData.floor) : undefined,
         totalFloors: formData.totalFloors ? Number(formData.totalFloors) : undefined,
@@ -409,18 +425,6 @@ export function AddPropertyPage() {
                 value={formData.ownerName}
                 onChange={(e) => updateField('ownerName', e.target.value)}
                 placeholder="Enter your full name"
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="phone">Contact Number *</Label>
-              <Input
-                id="phone"
-                type="tel"
-                value={formData.phoneNumber}
-                onChange={(e) => updateField('phoneNumber', e.target.value)}
-                placeholder="+91 98765 43210"
                 className="mt-1"
               />
             </div>
@@ -593,13 +597,27 @@ export function AddPropertyPage() {
               <Label>Property Photos *</Label>
               <div className="mt-2 space-y-3">
                 <div className="flex flex-col sm:flex-row gap-2">
+                  {/* Hidden file input — triggered by the button below */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handleFilesSelected}
+                  />
                   <Button
                     type="button"
-                    onClick={openCloudinaryWidget}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60"
                   >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload from Device
+                    {isUploading ? (
+                      <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                    ) : (
+                      <Upload className="w-4 h-4 mr-2" />
+                    )}
+                    {isUploading ? 'Uploading…' : 'Upload from Device'}
                   </Button>
                 </div>
 

@@ -1,0 +1,1972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TownHall — Production Architecture Blueprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0d0d0d;
+    --paper: #f5f0e8;
+    --cream: #ede7d9;
+    --rust: #c0392b;
+    --rust-light: #e8d5d3;
+    --gold: #b8860b;
+    --gold-light: #f5e6c0;
+    --forest: #1a3a2a;
+    --forest-light: #d4e6dc;
+    --slate: #2c3e50;
+    --muted: #7a7264;
+    --rule: #c8bfb0;
+    --mono: 'DM Mono', monospace;
+    --serif: 'DM Serif Display', serif;
+    --sans: 'Instrument Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.65;
+    overflow-x: hidden;
+  }
+
+  /* ─── COVER ─── */
+  .cover {
+    min-height: 100vh;
+    background: var(--forest);
+    color: var(--paper);
+    display: grid;
+    grid-template-rows: 1fr auto;
+    padding: 60px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(245,240,232,0.04) 60px),
+      repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(245,240,232,0.04) 60px);
+  }
+  .cover::after {
+    content: 'TOWNHALL';
+    position: absolute;
+    bottom: -40px;
+    right: -20px;
+    font-family: var(--serif);
+    font-size: clamp(120px, 20vw, 280px);
+    color: rgba(245,240,232,0.04);
+    white-space: nowrap;
+    pointer-events: none;
+    line-height: 1;
+  }
+  .cover-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: rgba(245,240,232,0.12);
+    border: 1px solid rgba(245,240,232,0.2);
+    padding: 6px 14px;
+    border-radius: 2px;
+    margin-bottom: 48px;
+  }
+  .cover h1 {
+    font-family: var(--serif);
+    font-size: clamp(48px, 8vw, 96px);
+    line-height: 1.0;
+    font-weight: 400;
+    max-width: 900px;
+    position: relative;
+    z-index: 1;
+  }
+  .cover h1 em {
+    color: #a8c8b0;
+    font-style: italic;
+  }
+  .cover-sub {
+    font-size: 18px;
+    color: rgba(245,240,232,0.65);
+    margin-top: 24px;
+    max-width: 520px;
+    position: relative;
+    z-index: 1;
+  }
+  .cover-meta {
+    display: flex;
+    gap: 40px;
+    border-top: 1px solid rgba(245,240,232,0.15);
+    padding-top: 32px;
+    position: relative;
+    z-index: 1;
+  }
+  .cover-meta-item label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(245,240,232,0.45);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .cover-meta-item span {
+    font-size: 14px;
+    color: rgba(245,240,232,0.85);
+  }
+
+  /* ─── NAV ─── */
+  .toc-nav {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 0 60px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 2px solid var(--rust);
+  }
+  .toc-nav a {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(245,240,232,0.55);
+    text-decoration: none;
+    padding: 18px 20px;
+    white-space: nowrap;
+    transition: color 0.2s;
+    border-right: 1px solid rgba(245,240,232,0.08);
+  }
+  .toc-nav a:hover { color: var(--paper); }
+  .toc-nav a:first-child { padding-left: 0; }
+
+  /* ─── LAYOUT ─── */
+  .section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 80px 60px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .section:last-child { border-bottom: none; }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+    max-width: 80px;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: clamp(32px, 4vw, 52px);
+    font-weight: 400;
+    line-height: 1.1;
+    margin-bottom: 40px;
+    color: var(--ink);
+  }
+  h2 .accent { color: var(--rust); font-style: italic; }
+
+  h3 {
+    font-family: var(--serif);
+    font-size: 24px;
+    font-weight: 400;
+    margin-bottom: 16px;
+    color: var(--ink);
+  }
+
+  h4 {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  p { margin-bottom: 16px; color: #3a3530; }
+  p:last-child { margin-bottom: 0; }
+
+  /* ─── GRID LAYOUTS ─── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  @media (max-width: 900px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .section { padding: 48px 24px; }
+    .cover { padding: 32px 24px; }
+    .toc-nav { padding: 0 24px; }
+  }
+
+  /* ─── CARDS ─── */
+  .card {
+    background: white;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 28px;
+  }
+  .card-dark {
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 4px;
+    padding: 28px;
+  }
+  .card-rust {
+    background: var(--rust);
+    color: white;
+    border-radius: 4px;
+    padding: 28px;
+  }
+  .card-forest {
+    background: var(--forest);
+    color: var(--paper);
+    border-radius: 4px;
+    padding: 28px;
+  }
+  .card-gold {
+    background: var(--gold-light);
+    border: 1px solid var(--gold);
+    border-radius: 4px;
+    padding: 28px;
+  }
+
+  /* ─── ARCH DIAGRAM ─── */
+  .arch-diagram {
+    background: var(--ink);
+    border-radius: 8px;
+    padding: 48px;
+    color: var(--paper);
+    position: relative;
+    overflow: hidden;
+  }
+  .arch-diagram::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      -45deg, transparent, transparent 8px,
+      rgba(255,255,255,0.015) 8px, rgba(255,255,255,0.015) 9px
+    );
+  }
+  .arch-layers {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+    z-index: 1;
+  }
+  .arch-layer {
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 20px 28px;
+    margin-bottom: 0;
+    position: relative;
+  }
+  .arch-layer-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 12px;
+  }
+  .arch-layer-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .arch-chip {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .chip-blue { background: rgba(100,149,237,0.2); border: 1px solid rgba(100,149,237,0.4); color: #a0c0ff; }
+  .chip-green { background: rgba(80,200,120,0.15); border: 1px solid rgba(80,200,120,0.3); color: #90daa0; }
+  .chip-orange { background: rgba(255,160,60,0.15); border: 1px solid rgba(255,160,60,0.3); color: #ffb870; }
+  .chip-red { background: rgba(220,80,80,0.15); border: 1px solid rgba(220,80,80,0.3); color: #ff9090; }
+  .chip-purple { background: rgba(180,100,240,0.15); border: 1px solid rgba(180,100,240,0.3); color: #d0a0ff; }
+  .chip-yellow { background: rgba(255,220,60,0.15); border: 1px solid rgba(255,220,60,0.3); color: #ffe080; }
+  .chip-teal { background: rgba(60,180,180,0.15); border: 1px solid rgba(60,180,180,0.3); color: #80e0e0; }
+
+  .arch-arrow {
+    text-align: center;
+    color: rgba(255,255,255,0.25);
+    font-size: 20px;
+    padding: 6px 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ─── FLOW DIAGRAMS ─── */
+  .flow-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 12px;
+  }
+  .flow-step {
+    flex: 0 0 auto;
+    width: 180px;
+    text-align: center;
+    position: relative;
+  }
+  .flow-step:not(:last-child)::after {
+    content: '→';
+    position: absolute;
+    right: -16px;
+    top: 50%;
+    transform: translateY(-60%);
+    color: var(--muted);
+    font-size: 18px;
+  }
+  .flow-node {
+    background: white;
+    border: 2px solid var(--rule);
+    border-radius: 6px;
+    padding: 14px 12px;
+    margin: 0 16px;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: border-color 0.2s;
+  }
+  .flow-node:hover { border-color: var(--rust); }
+  .flow-node-icon { font-size: 22px; }
+  .flow-node-text { font-size: 12px; font-weight: 500; line-height: 1.3; color: var(--ink); }
+  .flow-node-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .flow-node.highlight { border-color: var(--rust); background: var(--rust-light); }
+  .flow-node.success { border-color: var(--forest); background: var(--forest-light); }
+
+  /* ─── SCREEN FLOW ─── */
+  .screen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+  }
+  .screen-card {
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow: hidden;
+    background: white;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .screen-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+  .screen-mockup {
+    background: var(--slate);
+    height: 130px;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 5px;
+    position: relative;
+    overflow: hidden;
+  }
+  .mock-bar { background: rgba(255,255,255,0.1); border-radius: 2px; height: 8px; }
+  .mock-bar.w-full { width: 100%; }
+  .mock-bar.w-3q { width: 75%; }
+  .mock-bar.w-half { width: 50%; }
+  .mock-bar.w-1q { width: 25%; }
+  .mock-img { background: rgba(255,255,255,0.06); border-radius: 3px; flex: 1; }
+  .mock-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; flex: 1; }
+  .mock-grid-item { background: rgba(255,255,255,0.06); border-radius: 2px; }
+  .mock-input { background: rgba(255,255,255,0.08); border-radius: 2px; height: 22px; border: 1px solid rgba(255,255,255,0.15); }
+  .mock-btn { background: var(--rust); border-radius: 2px; height: 18px; width: 60%; }
+  .mock-label { font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.5); }
+  .screen-info { padding: 12px 14px; }
+  .screen-info strong { font-size: 13px; display: block; margin-bottom: 3px; }
+  .screen-info span { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .screen-route {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--cream);
+    color: var(--rust);
+    padding: 2px 8px;
+    border-radius: 2px;
+    display: inline-block;
+    margin-top: 4px;
+  }
+  .screen-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 2px;
+    font-weight: 500;
+  }
+  .badge-new { background: rgba(80,200,120,0.25); color: #60c080; border: 1px solid rgba(80,200,120,0.4); }
+  .badge-critical { background: rgba(220,80,80,0.25); color: #ff8080; border: 1px solid rgba(220,80,80,0.4); }
+  .badge-existing { background: rgba(100,149,237,0.2); color: #80b0ff; border: 1px solid rgba(100,149,237,0.3); }
+
+  /* ─── DB SCHEMA ─── */
+  .schema-table {
+    background: #0d1117;
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .schema-header {
+    background: #161b22;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .schema-table-name {
+    color: #7ee787;
+    font-weight: 500;
+    font-size: 14px;
+  }
+  .schema-table-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(100,149,237,0.2);
+    color: #79c0ff;
+    border: 1px solid rgba(100,149,237,0.3);
+  }
+  .schema-body { padding: 0; }
+  .schema-row {
+    display: grid;
+    grid-template-columns: 200px 160px 1fr auto;
+    padding: 9px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    align-items: center;
+    gap: 16px;
+  }
+  .schema-row:last-child { border-bottom: none; }
+  .schema-row:hover { background: rgba(255,255,255,0.02); }
+  .col-name { color: #79c0ff; }
+  .col-pk { color: #ffa657; }
+  .col-fk { color: #d2a8ff; }
+  .col-type { color: #a5d6ff; }
+  .col-constraint { color: #3fb950; font-size: 10px; }
+  .col-note { color: rgba(255,255,255,0.35); font-size: 11px; text-align: right; }
+  .schema-new { background: rgba(80,200,120,0.05); }
+
+  /* ─── STACK TABLE ─── */
+  .stack-table { width: 100%; border-collapse: collapse; }
+  .stack-table th {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 10px 16px;
+    background: var(--cream);
+    border-bottom: 2px solid var(--rule);
+  }
+  .stack-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--rule);
+    font-size: 13.5px;
+    vertical-align: top;
+  }
+  .stack-table tr:hover td { background: rgba(0,0,0,0.02); }
+  .stack-table td:first-child { font-weight: 500; }
+  .stack-table td .tool { font-family: var(--mono); font-size: 12px; color: var(--rust); }
+  .free-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--forest-light);
+    color: var(--forest);
+    padding: 2px 8px;
+    border-radius: 2px;
+    border: 1px solid rgba(26,58,42,0.2);
+    font-weight: 600;
+  }
+
+  /* ─── REVENUE ─── */
+  .revenue-phase {
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+  .revenue-phase-header {
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .phase-1-header { background: var(--rust); color: white; }
+  .phase-2-header { background: var(--forest); color: var(--paper); }
+  .phase-3-header { background: var(--gold); color: white; }
+  .revenue-phase-title { font-family: var(--serif); font-size: 22px; font-weight: 400; }
+  .revenue-phase-range {
+    font-family: var(--mono);
+    font-size: 12px;
+    opacity: 0.8;
+  }
+  .revenue-items { padding: 24px 28px; }
+  .revenue-item {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 20px;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .revenue-item:last-child { border-bottom: none; }
+  .revenue-item-name { font-weight: 500; font-size: 14px; }
+  .revenue-item-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .revenue-item-price {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--rust);
+    white-space: nowrap;
+  }
+  .revenue-item-type {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* ─── PROJECTION ─── */
+  .projection-table { width: 100%; border-collapse: collapse; }
+  .projection-table th, .projection-table td {
+    padding: 14px 20px;
+    text-align: right;
+    border-bottom: 1px solid var(--rule);
+  }
+  .projection-table th {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--cream);
+    text-align: right;
+  }
+  .projection-table th:first-child, .projection-table td:first-child { text-align: left; }
+  .projection-table td { font-family: var(--mono); font-size: 13px; }
+  .projection-table tr:last-child td { font-weight: 600; background: var(--gold-light); }
+  .bar-cell { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+  .mini-bar { height: 6px; background: var(--rust); border-radius: 3px; min-width: 4px; }
+
+  /* ─── SPRINT ─── */
+  .sprint-week {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 0;
+    margin-bottom: 0;
+    border: 1px solid var(--rule);
+    border-bottom: none;
+  }
+  .sprint-week:last-child { border-bottom: 1px solid var(--rule); border-radius: 0 0 6px 6px; }
+  .sprint-week:first-child { border-radius: 6px 6px 0 0; }
+  .sprint-week-label {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  .sprint-week-num {
+    font-family: var(--serif);
+    font-size: 36px;
+    line-height: 1;
+    color: rgba(245,240,232,0.3);
+  }
+  .sprint-week-name {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(245,240,232,0.6);
+    margin-top: 4px;
+  }
+  .sprint-week-content { padding: 20px 24px; }
+  .sprint-task {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 8px;
+    font-size: 13.5px;
+  }
+  .sprint-task:last-child { margin-bottom: 0; }
+  .sprint-task-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 7px;
+  }
+  .dot-red { background: var(--rust); }
+  .dot-green { background: #3a8a5a; }
+  .dot-gold { background: var(--gold); }
+  .dot-blue { background: cornflowerblue; }
+
+  /* ─── CALLOUT ─── */
+  .callout {
+    border-left: 4px solid var(--rust);
+    background: var(--rust-light);
+    padding: 20px 24px;
+    border-radius: 0 6px 6px 0;
+    margin: 28px 0;
+  }
+  .callout-forest {
+    border-left-color: var(--forest);
+    background: var(--forest-light);
+  }
+  .callout-gold {
+    border-left-color: var(--gold);
+    background: var(--gold-light);
+  }
+  .callout strong { color: var(--rust); font-size: 13px; display: block; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase; font-family: var(--mono); }
+  .callout-forest strong { color: var(--forest); }
+  .callout-gold strong { color: var(--gold); }
+  .callout p { color: var(--ink); margin-bottom: 0; font-size: 14px; }
+
+  /* ─── MISC ─── */
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--cream);
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    margin: 2px;
+  }
+  .pill-rust { background: var(--rust-light); color: var(--rust); border-color: rgba(192,57,43,0.2); }
+  .pill-green { background: var(--forest-light); color: var(--forest); border-color: rgba(26,58,42,0.2); }
+  .pill-gold { background: var(--gold-light); color: var(--gold); border-color: rgba(184,134,11,0.2); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--cream);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--rust);
+  }
+
+  .big-number {
+    font-family: var(--serif);
+    font-size: 64px;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .big-number.rust { color: var(--rust); }
+  .big-number.forest { color: var(--forest); }
+
+  hr { border: none; border-top: 1px solid var(--rule); margin: 32px 0; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+  @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+  ul.styled { list-style: none; padding: 0; }
+  ul.styled li {
+    padding: 8px 0 8px 24px;
+    border-bottom: 1px solid var(--rule);
+    position: relative;
+    font-size: 13.5px;
+  }
+  ul.styled li:last-child { border-bottom: none; }
+  ul.styled li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--rust);
+    font-size: 12px;
+  }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 32px 0;
+  }
+  @media (max-width: 700px) { .stat-row { grid-template-columns: 1fr 1fr; } }
+  .stat-cell {
+    background: white;
+    padding: 24px;
+    text-align: center;
+  }
+  .stat-cell .num { font-family: var(--serif); font-size: 36px; color: var(--rust); line-height: 1; }
+  .stat-cell .lbl { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-top: 6px; }
+
+  /* ─── ONBOARDING FLOW ─── */
+  .onboard-steps {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    position: relative;
+  }
+  @media (max-width: 800px) { .onboard-steps { grid-template-columns: 1fr 1fr; } }
+  .onboard-steps::before {
+    content: '';
+    position: absolute;
+    top: 36px;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: var(--rule);
+    z-index: 0;
+  }
+  .onboard-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 0 12px;
+    position: relative;
+    z-index: 1;
+  }
+  .onboard-num {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 2px solid var(--rule);
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--serif);
+    font-size: 26px;
+    color: var(--ink);
+    margin-bottom: 14px;
+    transition: all 0.2s;
+  }
+  .onboard-step:hover .onboard-num { border-color: var(--rust); color: var(--rust); }
+  .onboard-step.active .onboard-num { background: var(--rust); border-color: var(--rust); color: white; }
+  .onboard-step-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  .onboard-step-sub { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+  /* animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .section { animation: fadeUp 0.5s ease both; }
+
+  .tag { display: inline-block; font-family: var(--mono); font-size: 10px; background: var(--cream); border: 1px solid var(--rule); padding: 2px 8px; border-radius: 2px; color: var(--muted); margin-right: 6px; }
+  .tag-new { background: var(--forest-light); border-color: rgba(26,58,42,0.3); color: var(--forest); }
+  .tag-fix { background: var(--rust-light); border-color: rgba(192,57,43,0.3); color: var(--rust); }
+
+  .rls-badge {
+    display: inline-block;
+    background: rgba(80,200,120,0.15);
+    border: 1px solid rgba(80,200,120,0.3);
+    color: #3a8a5a;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════ COVER ════════════════════════════ -->
+<section class="cover">
+  <div>
+    <div class="cover-badge">Senior Architect's Blueprint · v2.0</div>
+    <h1>TownHall<br><em>Production</em><br>Architecture</h1>
+    <p class="cover-sub">A complete technical and business blueprint to take TownHall from hobby project to real-world rental marketplace — at zero infrastructure cost.</p>
+  </div>
+  <div class="cover-meta">
+    <div class="cover-meta-item"><label>Market</label><span>India — Tier 1 & 2 Cities</span></div>
+    <div class="cover-meta-item"><label>Stack</label><span>React · Supabase · Vercel</span></div>
+    <div class="cover-meta-item"><label>Revenue Model</label><span>3 Phases · 12 Months</span></div>
+    <div class="cover-meta-item"><label>Infra Cost</label><span>₹0 / month to start</span></div>
+  </div>
+</section>
+
+<!-- ════════════════════════════ NAV ════════════════════════════ -->
+<nav class="toc-nav">
+  <a href="#architecture">Architecture</a>
+  <a href="#userflow">User Flow</a>
+  <a href="#screens">Screens</a>
+  <a href="#stack">Tech Stack</a>
+  <a href="#database">Database</a>
+  <a href="#auth">Auth & Onboarding</a>
+  <a href="#revenue">Revenue Plan</a>
+  <a href="#sprint">Sprint Plan</a>
+</nav>
+
+<!-- ════════════════════════════ 1. SYSTEM ARCHITECTURE ════════════════════════════ -->
+<section class="section" id="architecture">
+  <div class="section-label">01 — System Architecture</div>
+  <h2>The Full <span class="accent">Stack</span> Picture</h2>
+
+  <p>TownHall's architecture follows a <strong>serverless-first, BaaS-heavy</strong> philosophy. This is the correct approach for a zero-cost launch — you write application logic, not infrastructure. The diagram below shows all layers and where each service lives.</p>
+
+  <div class="arch-diagram" style="margin: 40px 0;">
+    <div class="arch-layers">
+
+      <div class="arch-layer" style="border-color: rgba(100,149,237,0.3);">
+        <div class="arch-layer-label">① Client Layer — Browser / Mobile PWA</div>
+        <div class="arch-layer-items">
+          <span class="arch-chip chip-blue">React 18 + TypeScript</span>
+          <span class="arch-chip chip-blue">React Router v7</span>
+          <span class="arch-chip chip-blue">Tailwind CSS</span>
+          <span class="arch-chip chip-blue">Framer Motion</span>
+          <span class="arch-chip chip-blue">react-leaflet</span>
+          <span class="arch-chip chip-blue">react-hook-form</span>
+          <span class="arch-chip chip-blue">shadcn/ui</span>
+        </div>
+      </div>
+
+      <div class="arch-arrow">↕ HTTPS / REST / Realtime WS</div>
+
+      <div class="arch-layer" style="border-color: rgba(255,160,60,0.3);">
+        <div class="arch-layer-label">② Edge / Serverless Layer — Vercel</div>
+        <div class="arch-layer-items">
+          <span class="arch-chip chip-orange">Vercel Edge Network (CDN)</span>
+          <span class="arch-chip chip-orange">Vercel Serverless Functions (API Routes) ← NEW</span>
+          <span class="arch-chip chip-orange">Sitemap Generation ← NEW</span>
+        </div>
+      </div>
+
+      <div class="arch-arrow">↕ Supabase Client SDK / Edge Function calls</div>
+
+      <div class="arch-layer" style="border-color: rgba(80,200,120,0.3);">
+        <div class="arch-layer-label">③ Backend Layer — Supabase (BaaS)</div>
+        <div class="arch-layer-items">
+          <span class="arch-chip chip-green">PostgreSQL (RLS enabled)</span>
+          <span class="arch-chip chip-green">Supabase Auth (Google OAuth)</span>
+          <span class="arch-chip chip-green">Edge Functions (Deno) ← NEW</span>
+          <span class="arch-chip chip-green">pg_cron jobs ← NEW</span>
+          <span class="arch-chip chip-green">Realtime subscriptions ← NEW</span>
+          <span class="arch-chip chip-green">Full-text search (pg_trgm) ← NEW</span>
+        </div>
+      </div>
+
+      <div class="arch-arrow">↕ External API calls from Edge Functions only</div>
+
+      <div class="arch-layer" style="border-color: rgba(180,100,240,0.3);">
+        <div class="arch-layer-label">④ Third-party Services — Zero Cost Tiers</div>
+        <div class="arch-layer-items">
+          <span class="arch-chip chip-purple">Resend (email — 3K/mo free)</span>
+          <span class="arch-chip chip-purple">Razorpay (payments — 0 monthly, 2% per txn)</span>
+          <span class="arch-chip chip-purple">Upstash Redis (rate limiting — free tier)</span>
+          <span class="arch-chip chip-purple">Cloudinary (image CDN — existing)</span>
+          <span class="arch-chip chip-purple">Google OAuth</span>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="callout callout-gold">
+    <strong>Key Architectural Decision</strong>
+    <p>All third-party API calls (Razorpay, Resend, Cloudinary signed uploads) MUST go through Supabase Edge Functions — never directly from the browser. This protects your API keys and enables server-side validation. Your current Cloudinary unsigned upload is the biggest security gap to close immediately.</p>
+  </div>
+
+  <div class="grid-3" style="margin-top: 32px;">
+    <div class="card">
+      <h4>What changes</h4>
+      <ul class="styled">
+        <li>Unsigned uploads → Signed via Edge Fn</li>
+        <li>Client-side phone reveal → RLS gated</li>
+        <li>AppContext → React Query + Zustand</li>
+        <li>Bare meta tags → react-helmet-async SEO</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>What stays</h4>
+      <ul class="styled">
+        <li>Vite + React SPA (no framework migration)</li>
+        <li>All existing components reused</li>
+        <li>Supabase tables + RLS policies</li>
+        <li>Tailwind + shadcn/ui</li>
+        <li>Leaflet maps, Framer Motion</li>
+        <li>Cloudinary as image CDN</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>What gets added</h4>
+      <ul class="styled">
+        <li>Inquiries + messaging system</li>
+        <li>Email notifications (Resend)</li>
+        <li>Razorpay payment integration</li>
+        <li>Listing expiry cron + renewal</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════ 2. USER FLOWS ════════════════════════════ -->
+<section class="section" id="userflow">
+  <div class="section-label">02 — User Flows</div>
+  <h2>Every <span class="accent">Path</span> Through the Product</h2>
+
+  <!-- Tenant Flow -->
+  <h3 style="margin-bottom: 24px;">🔍 Tenant Flow — Browse & Contact</h3>
+  <div class="flow-container" style="margin-bottom: 48px; padding: 24px; background: white; border: 1px solid var(--rule); border-radius: 8px; overflow-x: auto;">
+    <div class="flow-step">
+      <div class="flow-node">
+        <div class="flow-node-icon">🏠</div>
+        <div class="flow-node-text">Landing Page</div>
+        <div class="flow-node-sub">Browse listings</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node">
+        <div class="flow-node-icon">🔎</div>
+        <div class="flow-node-text">Filter & Search</div>
+        <div class="flow-node-sub">BHK, rent, location</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node highlight">
+        <div class="flow-node-icon">📋</div>
+        <div class="flow-node-text">Property Detail</div>
+        <div class="flow-node-sub">Photos, map, specs</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node">
+        <div class="flow-node-icon">❤️</div>
+        <div class="flow-node-text">Save / Wishlist</div>
+        <div class="flow-node-sub">← NEW</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node highlight">
+        <div class="flow-node-icon">🔐</div>
+        <div class="flow-node-text">Sign In</div>
+        <div class="flow-node-sub">Google OAuth</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node">
+        <div class="flow-node-icon">📞</div>
+        <div class="flow-node-text">Reveal Contact</div>
+        <div class="flow-node-sub">3 free / month</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node success">
+        <div class="flow-node-icon">✉️</div>
+        <div class="flow-node-text">Send Inquiry</div>
+        <div class="flow-node-sub">Owner emailed</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Owner Flow -->
+  <h3 style="margin-bottom: 24px;">🏢 Owner Flow — List & Convert</h3>
+  <div class="flow-container" style="margin-bottom: 48px; padding: 24px; background: white; border: 1px solid var(--rule); border-radius: 8px; overflow-x: auto;">
+    <div class="flow-step">
+      <div class="flow-node highlight">
+        <div class="flow-node-icon">🔐</div>
+        <div class="flow-node-text">Sign In</div>
+        <div class="flow-node-sub">Google OAuth</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node">
+        <div class="flow-node-icon">📝</div>
+        <div class="flow-node-text">Add Property</div>
+        <div class="flow-node-sub">Multi-step form</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node">
+        <div class="flow-node-icon">🖼️</div>
+        <div class="flow-node-text">Upload Images</div>
+        <div class="flow-node-sub">Up to 10 photos</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node">
+        <div class="flow-node-icon">👁️</div>
+        <div class="flow-node-text">Preview</div>
+        <div class="flow-node-sub">Tenant's view</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node highlight">
+        <div class="flow-node-icon">💳</div>
+        <div class="flow-node-text">Choose Plan</div>
+        <div class="flow-node-sub">Free / Featured / Premium</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node">
+        <div class="flow-node-icon">✅</div>
+        <div class="flow-node-text">Listing Live</div>
+        <div class="flow-node-sub">status → active</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node success">
+        <div class="flow-node-icon">📊</div>
+        <div class="flow-node-text">Dashboard</div>
+        <div class="flow-node-sub">Views, inquiries</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expiry Flow -->
+  <h3 style="margin-bottom: 24px;">⏰ Listing Lifecycle (Automated)</h3>
+  <div class="flow-container" style="padding: 24px; background: white; border: 1px solid var(--rule); border-radius: 8px; overflow-x: auto;">
+    <div class="flow-step">
+      <div class="flow-node success">
+        <div class="flow-node-icon">🟢</div>
+        <div class="flow-node-text">Active</div>
+        <div class="flow-node-sub">status = active</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node">
+        <div class="flow-node-icon">⚠️</div>
+        <div class="flow-node-text">7-Day Warning</div>
+        <div class="flow-node-sub">Email sent by cron</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node highlight">
+        <div class="flow-node-icon">🔴</div>
+        <div class="flow-node-text">Expired</div>
+        <div class="flow-node-sub">pg_cron sets status</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node">
+        <div class="flow-node-icon">💌</div>
+        <div class="flow-node-text">Renewal Email</div>
+        <div class="flow-node-sub">CTA to renew</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-node success">
+        <div class="flow-node-icon">💳</div>
+        <div class="flow-node-text">Renew / Upgrade</div>
+        <div class="flow-node-sub">Razorpay</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════ 3. SCREEN FLOW ════════════════════════════ -->
+<section class="section" id="screens">
+  <div class="section-label">03 — Screen Flow</div>
+  <h2>All <span class="accent">Screens</span> & Routes</h2>
+
+  <p>Screens marked <span class="tag-new" style="font-family: var(--mono); font-size: 11px; display: inline-block; padding: 2px 8px; border-radius: 2px; background: var(--forest-light); color: var(--forest); border: 1px solid rgba(26,58,42,0.3);">NEW</span> are additions. <span class="tag-fix" style="font-family: var(--mono); font-size: 11px; display: inline-block; padding: 2px 8px; border-radius: 2px; background: var(--rust-light); color: var(--rust); border: 1px solid rgba(192,57,43,0.3);">FIX</span> indicates critical improvements to existing screens.</p>
+
+  <div class="screen-grid" style="margin-top: 32px;">
+
+    <!-- Landing -->
+    <div class="screen-card">
+      <div class="screen-mockup">
+        <div class="mock-bar w-full"></div>
+        <div class="mock-bar w-half"></div>
+        <div style="display:flex;gap:4px;margin:4px 0;">
+          <div class="mock-bar w-1q" style="height:14px;border-radius:10px;"></div>
+          <div class="mock-bar w-1q" style="height:14px;border-radius:10px;"></div>
+          <div class="mock-bar w-1q" style="height:14px;border-radius:10px;"></div>
+        </div>
+        <div class="mock-grid" style="flex:1;">
+          <div class="mock-grid-item"></div>
+          <div class="mock-grid-item"></div>
+          <div class="mock-grid-item"></div>
+          <div class="mock-grid-item"></div>
+        </div>
+        <span class="screen-badge badge-existing">Existing</span>
+      </div>
+      <div class="screen-info">
+        <strong>Landing / Browse</strong>
+        <span>Search · Filter · Grid · Sort</span>
+        <div class="screen-route">/</div>
+      </div>
+    </div>
+
+    <!-- Property Detail -->
+    <div class="screen-card">
+      <div class="screen-mockup">
+        <div class="mock-img" style="height:60px;"></div>
+        <div class="mock-bar w-3q" style="margin-top:4px;"></div>
+        <div class="mock-bar w-half"></div>
+        <div style="display:flex;gap:4px;margin-top:4px;">
+          <div class="mock-btn" style="flex:1;"></div>
+          <div class="mock-btn" style="width:30%;background:transparent;border:1px solid rgba(192,57,43,0.4);"></div>
+        </div>
+        <span class="screen-badge badge-fix">FIX: phone RLS</span>
+      </div>
+      <div class="screen-info">
+        <strong>Property Detail</strong>
+        <span>Photos · Inquiry · Contact Reveal</span>
+        <div class="screen-route">/property/:id</div>
+      </div>
+    </div>
+
+    <!-- Add Property -->
+    <div class="screen-card">
+      <div class="screen-mockup">
+        <div style="display:flex;gap:3px;margin-bottom:8px;">
+          <div style="flex:1;height:4px;background:var(--rust);border-radius:2px;"></div>
+          <div style="flex:1;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;"></div>
+          <div style="flex:1;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;"></div>
+        </div>
+        <div class="mock-label">Step 1 of 3</div>
+        <div class="mock-input" style="margin:4px 0;"></div>
+        <div class="mock-input"></div>
+        <div class="mock-btn" style="margin-top:8px;width:40%;"></div>
+        <span class="screen-badge badge-fix">FIX: signed upload</span>
+      </div>
+      <div class="screen-info">
+        <strong>Add Property</strong>
+        <span>Details → Images → Preview → Pay</span>
+        <div class="screen-route">/add-property</div>
+      </div>
+    </div>
+
+    <!-- Owner Dashboard -->
+    <div class="screen-card">
+      <div class="screen-mockup">
+        <div class="mock-bar w-half" style="margin-bottom:8px;"></div>
+        <div style="background:rgba(255,255,255,0.06);border-radius:3px;padding:6px;margin-bottom:4px;">
+          <div class="mock-bar w-3q" style="margin-bottom:3px;"></div>
+          <div style="display:flex;gap:4px;"><div class="mock-bar w-1q" style="height:8px;background:rgba(80,200,120,0.3);border-radius:10px;"></div><div class="mock-bar w-1q" style="height:8px;border-radius:10px;"></div></div>
+        </div>
+        <div style="background:rgba(255,255,255,0.06);border-radius:3px;padding:6px;">
+          <div class="mock-bar w-half" style="margin-bottom:3px;"></div>
+          <div class="mock-bar w-3q"></div>
+        </div>
+        <span class="screen-badge badge-fix">ADD: analytics</span>
+      </div>
+      <div class="screen-info">
+        <strong>Owner Dashboard</strong>
+        <span>Listings · Views · Inquiries · Renew</span>
+        <div class="screen-route">/dashboard</div>
+      </div>
+    </div>
+
+    <!-- Payment / Plan Selection — NEW -->
+    <div class="screen-card">
+      <div class="screen-mockup" style="background: #1a2a1a;">
+        <div class="mock-bar w-half" style="margin-bottom:8px;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;flex:1;">
+          <div style="background:rgba(255,255,255,0.06);border-radius:3px;padding:4px;">
+            <div class="mock-bar w-full" style="margin-bottom:2px;height:6px;"></div>
+            <div style="text-align:center;font-size:8px;color:rgba(255,255,255,0.3);padding:4px 0;">Free</div>
+          </div>
+          <div style="background:rgba(192,57,43,0.25);border-radius:3px;padding:4px;border:1px solid rgba(192,57,43,0.5);">
+            <div class="mock-bar w-full" style="margin-bottom:2px;height:6px;background:var(--rust);"></div>
+            <div style="text-align:center;font-size:8px;color:rgba(255,100,80,0.8);padding:4px 0;">Featured</div>
+          </div>
+          <div style="background:rgba(184,134,11,0.15);border-radius:3px;padding:4px;">
+            <div class="mock-bar w-full" style="margin-bottom:2px;height:6px;background:var(--gold);"></div>
+            <div style="text-align:center;font-size:8px;color:rgba(200,160,40,0.8);padding:4px 0;">Premium</div>
+          </div>
+        </div>
+        <span class="screen-badge badge-new">NEW</span>
+      </div>
+      <div class="screen-info">
+        <strong>Plan Selection</strong>
+        <span>Free / Featured / Premium · Razorpay</span>
+        <div class="screen-route">/payment/:id</div>
+      </div>
+    </div>
+
+    <!-- Inquiry / Contact — NEW -->
+    <div class="screen-card">
+      <div class="screen-mockup">
+        <div class="mock-bar w-3q" style="margin-bottom:8px;"></div>
+        <div class="mock-input" style="height:40px;"></div>
+        <div style="display:flex;gap:4px;margin-top:6px;">
+          <div class="mock-btn" style="flex:1;"></div>
+        </div>
+        <div class="mock-bar w-full" style="margin-top:6px;height:20px;opacity:0.4;"></div>
+        <span class="screen-badge badge-new">NEW</span>
+      </div>
+      <div class="screen-info">
+        <strong>Inquiry / Contact</strong>
+        <span>Message owner · Reveal phone</span>
+        <div class="screen-route">modal on /property/:id</div>
+      </div>
+    </div>
+
+    <!-- Tenant Alerts — NEW -->
+    <div class="screen-card">
+      <div class="screen-mockup">
+        <div class="mock-bar w-half" style="margin-bottom:8px;"></div>
+        <div class="mock-input" style="margin-bottom:4px;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;">
+          <div class="mock-input" style="height:16px;"></div>
+          <div class="mock-input" style="height:16px;"></div>
+        </div>
+        <div class="mock-btn" style="width:70%;"></div>
+        <span class="screen-badge badge-new">NEW</span>
+      </div>
+      <div class="screen-info">
+        <strong>Tenant Alerts</strong>
+        <span>Set criteria · Email notify</span>
+        <div class="screen-route">/alerts</div>
+      </div>
+    </div>
+
+    <!-- Saved Properties — NEW -->
+    <div class="screen-card">
+      <div class="screen-mockup">
+        <div class="mock-bar w-half" style="margin-bottom:8px;"></div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1;">
+          <div style="background:rgba(255,255,255,0.06);border-radius:3px;height:26px;display:flex;align-items:center;padding:0 8px;gap:6px;">
+            <div style="width:20px;height:16px;background:rgba(255,255,255,0.1);border-radius:2px;"></div>
+            <div class="mock-bar" style="width:60%;height:6px;"></div>
+            <div style="color:rgba(255,80,80,0.6);font-size:10px;">♥</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.06);border-radius:3px;height:26px;display:flex;align-items:center;padding:0 8px;gap:6px;">
+            <div style="width:20px;height:16px;background:rgba(255,255,255,0.1);border-radius:2px;"></div>
+            <div class="mock-bar" style="width:45%;height:6px;"></div>
+            <div style="color:rgba(255,80,80,0.6);font-size:10px;">♥</div>
+          </div>
+        </div>
+        <span class="screen-badge badge-new">NEW</span>
+      </div>
+      <div class="screen-info">
+        <strong>Saved Properties</strong>
+        <span>Wishlist · Compare</span>
+        <div class="screen-route">/saved</div>
+      </div>
+    </div>
+
+    <!-- Login -->
+    <div class="screen-card">
+      <div class="screen-mockup" style="background: #1e1e2e; justify-content: center; align-items: center; display: flex; flex-direction: column; gap: 8px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);"></div>
+        <div class="mock-bar w-half" style="height:10px;"></div>
+        <div style="background:white;border-radius:4px;width:80%;height:22px;display:flex;align-items:center;justify-content:center;gap:4px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:#4285f4;"></div>
+          <div style="width:40%;height:6px;background:#ddd;border-radius:2px;"></div>
+        </div>
+        <span class="screen-badge badge-fix">+ Onboarding</span>
+      </div>
+      <div class="screen-info">
+        <strong>Login + Onboarding</strong>
+        <span>Google OAuth · Role selection</span>
+        <div class="screen-route">/login</div>
+      </div>
+    </div>
+
+    <!-- Admin — NEW -->
+    <div class="screen-card">
+      <div class="screen-mockup" style="background:#0d0d0d;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <div class="mock-bar" style="width:30%;height:8px;background:rgba(255,80,80,0.4);"></div>
+          <div class="mock-bar" style="width:20%;height:8px;background:rgba(80,200,120,0.3);"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px;">
+          <div style="background:rgba(255,255,255,0.04);border-radius:2px;padding:6px;">
+            <div class="mock-bar w-full" style="height:16px;"></div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04);border-radius:2px;padding:6px;">
+            <div class="mock-bar w-full" style="height:16px;"></div>
+          </div>
+        </div>
+        <div class="mock-bar w-full" style="height:20px;"></div>
+        <span class="screen-badge badge-new">NEW</span>
+      </div>
+      <div class="screen-info">
+        <strong>Admin Panel</strong>
+        <span>Reports · Verify owners · Revenue</span>
+        <div class="screen-route">/admin</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════════ 4. TECH STACK ════════════════════════════ -->
+<section class="section" id="stack">
+  <div class="section-label">04 — Zero-Cost Tech Stack</div>
+  <h2>Every Tool, <span class="accent">Free Forever</span></h2>
+
+  <div class="stat-row">
+    <div class="stat-cell"><div class="num">₹0</div><div class="lbl">Monthly Infra Cost</div></div>
+    <div class="stat-cell"><div class="num">50K</div><div class="lbl">Free MAUs (Supabase)</div></div>
+    <div class="stat-cell"><div class="num">100GB</div><div class="lbl">Vercel Bandwidth/mo</div></div>
+    <div class="stat-cell"><div class="num">3K</div><div class="lbl">Free Emails/mo (Resend)</div></div>
+  </div>
+
+  <table class="stack-table">
+    <thead>
+      <tr>
+        <th>Layer</th>
+        <th>Service</th>
+        <th>Purpose</th>
+        <th>Free Tier Limit</th>
+        <th>Cost</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Frontend</td>
+        <td><span class="tool">React 18 + Vite + TypeScript</span></td>
+        <td>SPA with react-helmet-async for per-page SEO meta tags</td>
+        <td>Open source</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+      <tr>
+        <td>Hosting</td>
+        <td><span class="tool">Vercel</span></td>
+        <td>Deploy, CDN, Serverless Fns</td>
+        <td>100GB BW, unlimited deploys</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+      <tr>
+        <td>Database</td>
+        <td><span class="tool">Supabase PostgreSQL</span></td>
+        <td>All tables, RLS, full-text search</td>
+        <td>500MB, 50K MAUs</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+      <tr>
+        <td>Auth</td>
+        <td><span class="tool">Supabase Auth</span></td>
+        <td>Google OAuth, session mgmt</td>
+        <td>Unlimited auth requests</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+      <tr>
+        <td>Serverless</td>
+        <td><span class="tool">Supabase Edge Functions</span></td>
+        <td>Payment hooks, email triggers, signed uploads</td>
+        <td>500K invocations/month</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+      <tr>
+        <td>Scheduling</td>
+        <td><span class="tool">pg_cron (Supabase)</span></td>
+        <td>Listing expiry, renewal emails</td>
+        <td>Included with Supabase</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+      <tr>
+        <td>Email</td>
+        <td><span class="tool">Resend</span></td>
+        <td>Inquiry notifications, alerts, renewals</td>
+        <td>3,000 emails/month</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+      <tr>
+        <td>Images</td>
+        <td><span class="tool">Cloudinary</span></td>
+        <td>Transform + CDN (existing)</td>
+        <td>25GB storage, 25GB BW</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+      <tr>
+        <td>Payments</td>
+        <td><span class="tool">Razorpay</span></td>
+        <td>Listing plans, contact credits (Live API ✓)</td>
+        <td>No monthly fee</td>
+        <td><span class="free-badge">2% per txn</span></td>
+      </tr>
+      <tr>
+        <td>Rate Limiting</td>
+        <td><span class="tool">Upstash Redis</span></td>
+        <td>API abuse prevention</td>
+        <td>10K commands/day</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+      <tr>
+        <td>Maps</td>
+        <td><span class="tool">Leaflet + OpenStreetMap</span></td>
+        <td>Location picker, property map</td>
+        <td>Unlimited (OSM tiles)</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+      <tr>
+        <td>State Mgmt</td>
+        <td><span class="tool">TanStack Query + Zustand</span></td>
+        <td>Replace raw AppContext + useState</td>
+        <td>Open source</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+      <tr>
+        <td>Analytics</td>
+        <td><span class="tool">Vercel Analytics</span></td>
+        <td>Page views, Core Web Vitals</td>
+        <td>2,500 events/month</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+      <tr>
+        <td>Monitoring</td>
+        <td><span class="tool">Sentry (free tier)</span></td>
+        <td>Error tracking, performance</td>
+        <td>5K errors/month</td>
+        <td><span class="free-badge">FREE</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-forest" style="margin-top: 32px;">
+    <strong>SEO Without a Framework Migration</strong>
+    <p>Add <code>react-helmet-async</code> to manage per-page <code>&lt;title&gt;</code>, <code>&lt;meta og:*&gt;</code>, and JSON-LD structured data from inside the existing Vite SPA. Each property detail page gets its own SEO tags derived from Supabase data. Pair with a Vercel serverless function that generates <code>sitemap.xml</code> from all active listing IDs and submit to Google Search Console on launch day. No framework migration needed.</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════ 5. DATABASE ════════════════════════════ -->
+<section class="section" id="database">
+  <div class="section-label">05 — Core Database Schema</div>
+  <h2>PostgreSQL <span class="accent">Tables</span> — Full Production Schema</h2>
+
+  <p>All tables run on Supabase PostgreSQL with Row Level Security. New tables are marked. All foreign keys reference <code>auth.users</code> via Supabase Auth.</p>
+
+  <!-- properties (existing + extended) -->
+  <div class="schema-table">
+    <div class="schema-header">
+      <span class="schema-table-name">properties</span>
+      <span class="schema-table-badge">existing + extended</span>
+      <span class="rls-badge">RLS ✓</span>
+    </div>
+    <div class="schema-body">
+      <div class="schema-row"><span class="col-pk">id</span><span class="col-type">uuid</span><span class="col-constraint">PK DEFAULT gen_random_uuid()</span><span class="col-note"></span></div>
+      <div class="schema-row"><span class="col-name">owner_id</span><span class="col-type">uuid</span><span class="col-constraint">FK → auth.users NOT NULL</span><span class="col-note">RLS: owner only</span></div>
+      <div class="schema-row"><span class="col-name">title</span><span class="col-type">text</span><span class="col-constraint">NOT NULL</span><span class="col-note"></span></div>
+      <div class="schema-row"><span class="col-name">rent</span><span class="col-type">integer</span><span class="col-constraint">NOT NULL CHECK (rent > 0)</span><span class="col-note">INR/month</span></div>
+      <div class="schema-row"><span class="col-name">deposit</span><span class="col-type">integer</span><span class="col-constraint">NOT NULL</span><span class="col-note"></span></div>
+      <div class="schema-row"><span class="col-name">bhk</span><span class="col-type">text</span><span class="col-constraint">CHECK IN ('Studio','1BHK','2BHK','3BHK','4BHK+')</span><span class="col-note"></span></div>
+      <div class="schema-row"><span class="col-name">location</span><span class="col-type">text</span><span class="col-constraint">NOT NULL</span><span class="col-note"></span></div>
+      <div class="schema-row"><span class="col-name">location_tsv</span><span class="col-type">tsvector</span><span class="col-constraint">GENERATED — GIN index</span><span class="col-note">← ADD for FTS</span></div>
+      <div class="schema-row"><span class="col-name">latitude / longitude</span><span class="col-type">float8</span><span class="col-constraint">nullable</span><span class="col-note"></span></div>
+      <div class="schema-row"><span class="col-name">images</span><span class="col-type">text[]</span><span class="col-constraint">DEFAULT '{}'</span><span class="col-note">Cloudinary URLs</span></div>
+      <div class="schema-row"><span class="col-name">status</span><span class="col-type">text</span><span class="col-constraint">DEFAULT 'pending' CHECK IN ('pending','active','expired','flagged')</span><span class="col-note">← ADD 'flagged'</span></div>
+      <div class="schema-row"><span class="col-name">plan_type</span><span class="col-type">text</span><span class="col-constraint">DEFAULT 'free' CHECK IN ('free','featured','premium')</span><span class="col-note">← ADD</span></div>
+      <div class="schema-row schema-new"><span class="col-name">owner_phone</span><span class="col-type">text</span><span class="col-constraint">— NOT returned by default SELECT *</span><span class="col-note">← FIX: RLS gated</span></div>
+      <div class="schema-row"><span class="col-name">view_count</span><span class="col-type">integer</span><span class="col-constraint">DEFAULT 0</span><span class="col-note"></span></div>
+      <div class="schema-row"><span class="col-name">expires_at</span><span class="col-type">timestamptz</span><span class="col-constraint">nullable</span><span class="col-note">set by plan purchase</span></div>
+      <div class="schema-row"><span class="col-name">created_at</span><span class="col-type">timestamptz</span><span class="col-constraint">DEFAULT now()</span><span class="col-note"></span></div>
+    </div>
+  </div>
+
+  <!-- inquiries -->
+  <div class="schema-table">
+    <div class="schema-header">
+      <span class="schema-table-name">inquiries</span>
+      <span class="schema-table-badge" style="background:rgba(80,200,120,0.2);color:#7ee787;border-color:rgba(80,200,120,0.3);">NEW</span>
+      <span class="rls-badge">RLS ✓</span>
+    </div>
+    <div class="schema-body">
+      <div class="schema-row schema-new"><span class="col-pk">id</span><span class="col-type">uuid</span><span class="col-constraint">PK DEFAULT gen_random_uuid()</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-fk">property_id</span><span class="col-type">uuid</span><span class="col-constraint">FK → properties</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-fk">tenant_id</span><span class="col-type">uuid</span><span class="col-constraint">FK → auth.users</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-name">message</span><span class="col-type">text</span><span class="col-constraint">NOT NULL</span><span class="col-note">max 500 chars</span></div>
+      <div class="schema-row schema-new"><span class="col-name">tenant_name</span><span class="col-type">text</span><span class="col-constraint">NOT NULL</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-name">tenant_email</span><span class="col-type">text</span><span class="col-constraint">NOT NULL</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-name">status</span><span class="col-type">text</span><span class="col-constraint">DEFAULT 'pending' CHECK IN ('pending','seen','replied')</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-name">created_at</span><span class="col-type">timestamptz</span><span class="col-constraint">DEFAULT now()</span><span class="col-note"></span></div>
+    </div>
+  </div>
+
+  <!-- contact_reveals -->
+  <div class="schema-table">
+    <div class="schema-header">
+      <span class="schema-table-name">contact_reveals</span>
+      <span class="schema-table-badge" style="background:rgba(80,200,120,0.2);color:#7ee787;border-color:rgba(80,200,120,0.3);">NEW — Critical Security</span>
+      <span class="rls-badge">RLS ✓</span>
+    </div>
+    <div class="schema-body">
+      <div class="schema-row schema-new"><span class="col-pk">id</span><span class="col-type">uuid</span><span class="col-constraint">PK</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-fk">tenant_id</span><span class="col-type">uuid</span><span class="col-constraint">FK → auth.users NOT NULL</span><span class="col-note">must be authenticated</span></div>
+      <div class="schema-row schema-new"><span class="col-fk">property_id</span><span class="col-type">uuid</span><span class="col-constraint">FK → properties NOT NULL</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-name">created_at</span><span class="col-type">timestamptz</span><span class="col-constraint">DEFAULT now()</span><span class="col-note">rate-limit: 3/month free</span></div>
+    </div>
+  </div>
+
+  <!-- saved_properties -->
+  <div class="schema-table">
+    <div class="schema-header">
+      <span class="schema-table-name">saved_properties</span>
+      <span class="schema-table-badge" style="background:rgba(80,200,120,0.2);color:#7ee787;border-color:rgba(80,200,120,0.3);">NEW</span>
+      <span class="rls-badge">RLS ✓</span>
+    </div>
+    <div class="schema-body">
+      <div class="schema-row schema-new"><span class="col-fk">tenant_id</span><span class="col-type">uuid</span><span class="col-constraint">FK → auth.users</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-fk">property_id</span><span class="col-type">uuid</span><span class="col-constraint">FK → properties</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-name">created_at</span><span class="col-type">timestamptz</span><span class="col-constraint">DEFAULT now()</span><span class="col-note">PK: (tenant_id, property_id)</span></div>
+    </div>
+  </div>
+
+  <!-- listing_plans -->
+  <div class="schema-table">
+    <div class="schema-header">
+      <span class="schema-table-name">listing_plans</span>
+      <span class="schema-table-badge" style="background:rgba(80,200,120,0.2);color:#7ee787;border-color:rgba(80,200,120,0.3);">NEW — Revenue</span>
+      <span class="rls-badge">RLS ✓</span>
+    </div>
+    <div class="schema-body">
+      <div class="schema-row schema-new"><span class="col-pk">id</span><span class="col-type">uuid</span><span class="col-constraint">PK</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-fk">property_id</span><span class="col-type">uuid</span><span class="col-constraint">FK → properties</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-fk">owner_id</span><span class="col-type">uuid</span><span class="col-constraint">FK → auth.users</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-name">plan_type</span><span class="col-type">text</span><span class="col-constraint">CHECK IN ('free','featured','premium')</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-name">amount_inr</span><span class="col-type">integer</span><span class="col-constraint">NOT NULL</span><span class="col-note">0 for free</span></div>
+      <div class="schema-row schema-new"><span class="col-name">razorpay_payment_id</span><span class="col-type">text</span><span class="col-constraint">nullable</span><span class="col-note">verify server-side</span></div>
+      <div class="schema-row schema-new"><span class="col-name">duration_days</span><span class="col-type">integer</span><span class="col-constraint">NOT NULL</span><span class="col-note">30 / 60</span></div>
+      <div class="schema-row schema-new"><span class="col-name">purchased_at</span><span class="col-type">timestamptz</span><span class="col-constraint">DEFAULT now()</span><span class="col-note"></span></div>
+    </div>
+  </div>
+
+  <!-- tenant_alerts -->
+  <div class="schema-table">
+    <div class="schema-header">
+      <span class="schema-table-name">tenant_alerts</span>
+      <span class="schema-table-badge" style="background:rgba(80,200,120,0.2);color:#7ee787;border-color:rgba(80,200,120,0.3);">NEW — Phase 2</span>
+      <span class="rls-badge">RLS ✓</span>
+    </div>
+    <div class="schema-body">
+      <div class="schema-row schema-new"><span class="col-pk">id</span><span class="col-type">uuid</span><span class="col-constraint">PK</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-fk">tenant_id</span><span class="col-type">uuid</span><span class="col-constraint">FK → auth.users</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-name">location_query</span><span class="col-type">text</span><span class="col-constraint">NOT NULL</span><span class="col-note">e.g. "Koramangala, Bangalore"</span></div>
+      <div class="schema-row schema-new"><span class="col-name">bhk_filter</span><span class="col-type">text[]</span><span class="col-constraint">nullable</span><span class="col-note">['1BHK','2BHK']</span></div>
+      <div class="schema-row schema-new"><span class="col-name">max_rent</span><span class="col-type">integer</span><span class="col-constraint">nullable</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-name">is_active</span><span class="col-type">boolean</span><span class="col-constraint">DEFAULT true</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-name">created_at</span><span class="col-type">timestamptz</span><span class="col-constraint">DEFAULT now()</span><span class="col-note"></span></div>
+    </div>
+  </div>
+
+  <!-- reports -->
+  <div class="schema-table">
+    <div class="schema-header">
+      <span class="schema-table-name">listing_reports</span>
+      <span class="schema-table-badge" style="background:rgba(80,200,120,0.2);color:#7ee787;border-color:rgba(80,200,120,0.3);">NEW — Trust & Safety</span>
+      <span class="rls-badge">RLS ✓</span>
+    </div>
+    <div class="schema-body">
+      <div class="schema-row schema-new"><span class="col-pk">id</span><span class="col-type">uuid</span><span class="col-constraint">PK</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-fk">property_id</span><span class="col-type">uuid</span><span class="col-constraint">FK → properties</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-fk">reporter_id</span><span class="col-type">uuid</span><span class="col-constraint">FK → auth.users</span><span class="col-note">nullable for anon</span></div>
+      <div class="schema-row schema-new"><span class="col-name">reason</span><span class="col-type">text</span><span class="col-constraint">CHECK IN ('fake','duplicate','wrong_price','offensive','other')</span><span class="col-note"></span></div>
+      <div class="schema-row schema-new"><span class="col-name">resolved</span><span class="col-type">boolean</span><span class="col-constraint">DEFAULT false</span><span class="col-note">admin action</span></div>
+      <div class="schema-row schema-new"><span class="col-name">created_at</span><span class="col-type">timestamptz</span><span class="col-constraint">DEFAULT now()</span><span class="col-note"></span></div>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top: 32px;">
+    <strong>Critical RLS Policy — Phone Number Protection</strong>
+    <p>Add this policy to <code>properties</code>: <code>owner_phone</code> is excluded from the default <code>SELECT *</code> public policy. Create a separate Supabase RPC function <code>reveal_owner_phone(property_id)</code> that (1) checks the caller is authenticated, (2) inserts a row into <code>contact_reveals</code>, (3) checks monthly reveal quota, (4) returns the phone number. This single change closes your biggest security gap.</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════ 6. AUTH & ONBOARDING ════════════════════════════ -->
+<section class="section" id="auth">
+  <div class="section-label">06 — Google Sign-In + Onboarding</div>
+  <h2>First Impression <span class="accent">Counts</span></h2>
+
+  <p>The current auth flow drops users directly to the dashboard after Google sign-in with no context. Production onboarding answers two questions: <em>who are you?</em> and <em>what do you want to do?</em> This drives better SEO (role data), better personalisation, and measurably higher retention.</p>
+
+  <div style="background: white; border: 1px solid var(--rule); border-radius: 8px; padding: 48px 32px; margin: 40px 0;">
+    <div class="onboard-steps">
+      <div class="onboard-step active">
+        <div class="onboard-num">1</div>
+        <div class="onboard-step-title">Sign In</div>
+        <div class="onboard-step-sub">One-tap Google OAuth via Supabase</div>
+      </div>
+      <div class="onboard-step">
+        <div class="onboard-num">2</div>
+        <div class="onboard-step-title">Role Select</div>
+        <div class="onboard-step-sub">"I'm looking for a place" or "I have a place to rent"</div>
+      </div>
+      <div class="onboard-step">
+        <div class="onboard-num">3</div>
+        <div class="onboard-step-title">City</div>
+        <div class="onboard-step-sub">Preferred city + neighbourhood for relevant results</div>
+      </div>
+      <div class="onboard-step">
+        <div class="onboard-num">4</div>
+        <div class="onboard-step-title">Preferences</div>
+        <div class="onboard-step-sub">BHK type + max budget (tenant) or listing type (owner)</div>
+      </div>
+      <div class="onboard-step">
+        <div class="onboard-num">5</div>
+        <div class="onboard-step-title">Done ✓</div>
+        <div class="onboard-step-sub">Personalised landing or dashboard redirect</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <h3>Auth Implementation</h3>
+      <ul class="styled">
+        <li>Keep Google OAuth via Supabase Auth (no changes needed)</li>
+        <li>After first sign-in, check <code>profiles.onboarding_complete</code></li>
+        <li>If false → redirect to <code>/welcome</code> onboarding flow</li>
+        <li>Store role in <code>profiles</code> table: <code>'tenant' | 'owner' | 'both'</code></li>
+        <li>Phone number collected in onboarding (not Google profile)</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Profiles Table <span class="tag-new">NEW</span></h3>
+      <div class="schema-table" style="margin-top: 0;">
+        <div class="schema-body" style="font-size: 11.5px;">
+          <div class="schema-row schema-new"><span class="col-pk" style="font-size:11px;">id</span><span class="col-type" style="font-size:11px;">uuid</span><span class="col-constraint" style="font-size:11px;">FK → auth.users (PK)</span><span></span></div>
+          <div class="schema-row schema-new"><span class="col-name" style="font-size:11px;">role</span><span class="col-type" style="font-size:11px;">text</span><span class="col-constraint" style="font-size:11px;">'tenant'|'owner'|'both'</span><span></span></div>
+          <div class="schema-row schema-new"><span class="col-name" style="font-size:11px;">phone</span><span class="col-type" style="font-size:11px;">text</span><span class="col-constraint" style="font-size:11px;">nullable</span><span></span></div>
+          <div class="schema-row schema-new"><span class="col-name" style="font-size:11px;">city</span><span class="col-type" style="font-size:11px;">text</span><span class="col-constraint" style="font-size:11px;">nullable</span><span></span></div>
+          <div class="schema-row schema-new"><span class="col-name" style="font-size:11px;">onboarding_complete</span><span class="col-type" style="font-size:11px;">boolean</span><span class="col-constraint" style="font-size:11px;">DEFAULT false</span><span></span></div>
+          <div class="schema-row schema-new"><span class="col-name" style="font-size:11px;">reveal_credits</span><span class="col-type" style="font-size:11px;">integer</span><span class="col-constraint" style="font-size:11px;">DEFAULT 3 — resets monthly</span><span></span></div>
+          <div class="schema-row schema-new"><span class="col-name" style="font-size:11px;">is_verified_owner</span><span class="col-type" style="font-size:11px;">boolean</span><span class="col-constraint" style="font-size:11px;">DEFAULT false</span><span></span></div>
+          <div class="schema-row schema-new"><span class="col-name" style="font-size:11px;">created_at</span><span class="col-type" style="font-size:11px;">timestamptz</span><span class="col-constraint" style="font-size:11px;">DEFAULT now()</span><span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-forest" style="margin-top: 32px;">
+    <strong>Supabase Trigger — Auto-create Profile</strong>
+    <p>Add a PostgreSQL trigger: <code>AFTER INSERT ON auth.users</code> → automatically inserts a row into <code>profiles</code> with default values. This means you never have a user without a profile record, eliminating an entire class of null-pointer bugs in your frontend.</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════ 7. REVENUE ════════════════════════════ -->
+<section class="section" id="revenue">
+  <div class="section-label">07 — Revenue & Business Plan</div>
+  <h2>Three Phases,<br><span class="accent">One Runway</span></h2>
+
+  <p>The model is proven: NoBroker reached ₹637 Cr revenue in FY23 on this exact mechanic — listing fees + lead credits. TownHall's advantage is hyper-local focus and zero-commission trust. Start in one city, own it, then expand.</p>
+
+  <!-- Phase 1 -->
+  <div class="revenue-phase">
+    <div class="revenue-phase-header phase-1-header">
+      <div>
+        <div class="revenue-phase-title">Phase 1 — Visibility Economy</div>
+        <p style="margin:4px 0 0;opacity:0.8;font-size:14px;">Owner-side monetisation. Tenants browse for free. Owners pay to be seen.</p>
+      </div>
+      <div class="revenue-phase-range">Month 1 → 6</div>
+    </div>
+    <div class="revenue-items">
+      <div class="revenue-item">
+        <div>
+          <div class="revenue-item-name">Free Listing <span class="pill">₹0</span></div>
+          <div class="revenue-item-desc">30-day active listing, standard ranking, no badge. Acquires supply.</div>
+        </div>
+        <div class="revenue-item-price">₹0</div>
+        <div class="revenue-item-type">always free</div>
+      </div>
+      <div class="revenue-item">
+        <div>
+          <div class="revenue-item-name">Featured Listing <span class="pill-rust pill">★ Featured</span></div>
+          <div class="revenue-item-desc">30-day duration. +30 ranking boost. "Featured" badge on card. Highlighted border in grid.</div>
+        </div>
+        <div class="revenue-item-price">₹199 / mo</div>
+        <div class="revenue-item-type">one-time Razorpay</div>
+      </div>
+      <div class="revenue-item">
+        <div>
+          <div class="revenue-item-name">Premium Listing <span class="pill-gold pill">⭐ Premium</span></div>
+          <div class="revenue-item-desc">60-day duration. Top-of-results placement. Premium card style. Priority in email alerts sent to tenants.</div>
+        </div>
+        <div class="revenue-item-price">₹499 / 2 mo</div>
+        <div class="revenue-item-type">one-time Razorpay</div>
+      </div>
+      <div class="revenue-item">
+        <div>
+          <div class="revenue-item-name">Listing Renewal</div>
+          <div class="revenue-item-desc">Re-activate expired listing. Owner emailed 7 days before expiry by pg_cron job via Resend.</div>
+        </div>
+        <div class="revenue-item-price">₹99 / renewal</div>
+        <div class="revenue-item-type">recurring Razorpay</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 2 -->
+  <div class="revenue-phase">
+    <div class="revenue-phase-header phase-2-header">
+      <div>
+        <div class="revenue-phase-title">Phase 2 — Lead & Intent</div>
+        <p style="margin:4px 0 0;opacity:0.8;font-size:14px;">Tenant-side monetisation. Charge for high-intent actions: contact, alerts, saved comparisons.</p>
+      </div>
+      <div class="revenue-phase-range">Month 4 → 9</div>
+    </div>
+    <div class="revenue-items">
+      <div class="revenue-item">
+        <div>
+          <div class="revenue-item-name">Contact Reveal Credits</div>
+          <div class="revenue-item-desc">3 free reveals/month per tenant. Purchase more: 10 credits pack or unlimited monthly.</div>
+        </div>
+        <div class="revenue-item-price">₹49 / 10 credits<br><span style="font-size:12px;">₹149 / month unlimited</span></div>
+        <div class="revenue-item-type">Razorpay</div>
+      </div>
+      <div class="revenue-item">
+        <div>
+          <div class="revenue-item-name">Tenant Alert Subscription</div>
+          <div class="revenue-item-desc">Email instant alerts when a matching listing is posted. Set criteria: city, BHK, max rent.</div>
+        </div>
+        <div class="revenue-item-price">₹99 / month</div>
+        <div class="revenue-item-type">recurring</div>
+      </div>
+      <div class="revenue-item">
+        <div>
+          <div class="revenue-item-name">Priority Inquiry</div>
+          <div class="revenue-item-desc">Tenant's inquiry shown at top of owner's inbox with "Interested" badge. Improves response rate.</div>
+        </div>
+        <div class="revenue-item-price">₹29 / inquiry</div>
+        <div class="revenue-item-type">optional add-on</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 3 -->
+  <div class="revenue-phase">
+    <div class="revenue-phase-header phase-3-header">
+      <div>
+        <div class="revenue-phase-title">Phase 3 — Services Layer</div>
+        <p style="margin:4px 0 0;opacity:0.8;font-size:14px;">High-margin services. Pure software + API partnerships. 60–80% gross margin.</p>
+      </div>
+      <div class="revenue-phase-range">Month 6 → 12</div>
+    </div>
+    <div class="revenue-items">
+      <div class="revenue-item">
+        <div>
+          <div class="revenue-item-name">Rental Agreement PDF</div>
+          <div class="revenue-item-desc">Generate a legally compliant rental agreement from listing data + tenant details. Delivered as signed PDF.</div>
+        </div>
+        <div class="revenue-item-price">₹299 / doc</div>
+        <div class="revenue-item-type">~₹280 margin</div>
+      </div>
+      <div class="revenue-item">
+        <div>
+          <div class="revenue-item-name">Owner Verification Badge</div>
+          <div class="revenue-item-desc">One-time Aadhaar/PAN check via Digilocker API. "Verified Owner" badge on all listings permanently.</div>
+        </div>
+        <div class="revenue-item-price">₹199 one-time</div>
+        <div class="revenue-item-type">~₹140 margin</div>
+      </div>
+      <div class="revenue-item">
+        <div>
+          <div class="revenue-item-name">Tenant Background Check</div>
+          <div class="revenue-item-desc">Owner requests check on a tenant. Integrated with AuthBridge/IDfy pay-per-check API. Identity + employment verification.</div>
+        </div>
+        <div class="revenue-item-price">₹499 / report</div>
+        <div class="revenue-item-type">~₹350 margin</div>
+      </div>
+      <div class="revenue-item">
+        <div>
+          <div class="revenue-item-name">Property Photography (Local Partners)</div>
+          <div class="revenue-item-desc">Refer to local photography partners. Affiliate commission. Zero tech effort.</div>
+        </div>
+        <div class="revenue-item-price">₹199 commission</div>
+        <div class="revenue-item-type">affiliate</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Projections -->
+  <h3 style="margin: 48px 0 24px;">Revenue Projection — Single City Launch</h3>
+  <table class="projection-table">
+    <thead>
+      <tr>
+        <th>Period</th>
+        <th>Active Listings</th>
+        <th>Paid Listings (5%)</th>
+        <th>Listing Revenue</th>
+        <th>Lead Revenue</th>
+        <th>Services</th>
+        <th>Total / Month</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Month 3</td>
+        <td>200</td>
+        <td>10</td>
+        <td>₹2,490</td>
+        <td>—</td>
+        <td>—</td>
+        <td>
+          <div class="bar-cell">
+            <div class="mini-bar" style="width: 20px;"></div>
+            ₹2,490
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td>Month 6</td>
+        <td>800</td>
+        <td>40</td>
+        <td>₹11,960</td>
+        <td>₹8,000</td>
+        <td>—</td>
+        <td>
+          <div class="bar-cell">
+            <div class="mini-bar" style="width: 60px;"></div>
+            ₹19,960
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td>Month 9</td>
+        <td>1,800</td>
+        <td>90</td>
+        <td>₹26,910</td>
+        <td>₹32,000</td>
+        <td>₹12,000</td>
+        <td>
+          <div class="bar-cell">
+            <div class="mini-bar" style="width: 120px;"></div>
+            ₹70,910
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td>Month 12</td>
+        <td>3,500</td>
+        <td>175</td>
+        <td>₹52,325</td>
+        <td>₹75,000</td>
+        <td>₹55,000</td>
+        <td>
+          <div class="bar-cell">
+            <div class="mini-bar" style="width: 200px;"></div>
+            ₹1,82,325
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-gold" style="margin-top: 32px;">
+    <strong>The One Metric That Drives Everything</strong>
+    <p>Focus on <strong>listings per city block / neighbourhood</strong>. Density creates the network effect. A tenant searching "2BHK in Koramangala" who finds 15 options on TownHall vs 2 on a competitor becomes a loyal user. Launch in one neighbourhood, make it the most comprehensive rental source for that area, then expand outward. This is exactly how Zomato won — restaurant by restaurant, neighbourhood by neighbourhood.</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════ 8. SPRINT PLAN ════════════════════════════ -->
+<section class="section" id="sprint">
+  <div class="section-label">08 — 30-Day Sprint to Production</div>
+  <h2>Ship in <span class="accent">Four Weeks</span></h2>
+
+  <p>Minimum work, maximum production-readiness. Every task is doable solo. Weeks are ordered by risk reduction, not feature value.</p>
+
+  <div style="margin-top: 32px;">
+    <div class="sprint-week">
+      <div class="sprint-week-label" style="background: var(--rust);">
+        <div class="sprint-week-num">W1</div>
+        <div class="sprint-week-name">Security</div>
+      </div>
+      <div class="sprint-week-content">
+        <div class="sprint-task"><div class="sprint-task-dot dot-red"></div><div><strong>Fix phone number exposure</strong> — Remove owner_phone from public SELECT policy. Create <code>reveal_owner_phone()</code> RPC with auth check + contact_reveals insert + quota check.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-red"></div><div><strong>Signed Cloudinary uploads</strong> — Create Supabase Edge Function <code>sign-upload</code> that generates a signed upload URL. Remove VITE_CLOUDINARY_UPLOAD_PRESET from client bundle.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-red"></div><div><strong>Add profiles table</strong> — Create table + trigger on auth.users insert. Map onboarding_complete, role, reveal_credits columns.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-red"></div><div><strong>Add listing_reports table + UI</strong> — Simple "Report this listing" button on property detail. Feeds admin review queue.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-red"></div><div><strong>Rate-limit view_count increments</strong> — Use Upstash Redis to rate-limit to 1 increment per IP per listing per 24h. Prevents gaming the ranking.</div></div>
+      </div>
+    </div>
+
+    <div class="sprint-week">
+      <div class="sprint-week-label" style="background: #2c4a3e;">
+        <div class="sprint-week-num">W2</div>
+        <div class="sprint-week-name">Communication</div>
+      </div>
+      <div class="sprint-week-content">
+        <div class="sprint-task"><div class="sprint-task-dot dot-green"></div><div><strong>Inquiry system</strong> — Create inquiries table. Add inquiry form modal on property detail. Edge Function sends email to owner via Resend on new inquiry.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-green"></div><div><strong>Listing expiry cron</strong> — pg_cron job runs nightly: SET status='expired' WHERE expires_at &lt; now() AND status='active'. Trigger Resend email to owner with renewal CTA.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-green"></div><div><strong>7-day expiry warning</strong> — Second cron: send warning email to owners whose listing expires in 7 days. Include upgrade CTA to Premium.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-green"></div><div><strong>Saved properties</strong> — saved_properties table + heart button on PropertyCard. Tenant's /saved page listing all wishlisted properties.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-green"></div><div><strong>Onboarding flow</strong> — /welcome page: 3-step role + city + preferences. Sets profiles.onboarding_complete = true. ProtectedRoute redirects first-time users here.</div></div>
+      </div>
+    </div>
+
+    <div class="sprint-week">
+      <div class="sprint-week-label" style="background: #1a1a2e;">
+        <div class="sprint-week-num">W3</div>
+        <div class="sprint-week-name">SEO & Perf</div>
+      </div>
+      <div class="sprint-week-content">
+        <div class="sprint-task"><div class="sprint-task-dot dot-blue"></div><div><strong>Add react-helmet-async for per-page SEO</strong> — Install and wrap the app in <code>HelmetProvider</code>. Add dynamic <code>&lt;title&gt;</code>, <code>&lt;meta og:title&gt;</code>, <code>&lt;meta og:image&gt;</code>, <code>&lt;meta og:description&gt;</code> to <code>PropertyDetailPage</code> using Supabase-fetched data. No framework migration required.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-blue"></div><div><strong>Sitemap.xml + robots.txt</strong> — Vercel serverless function that queries Supabase for all active property IDs and outputs a valid sitemap. Add static <code>robots.txt</code> pointing to it. Submit both to Google Search Console on launch day.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-blue"></div><div><strong>JSON-LD structured data</strong> — Add <code>RealEstateListing</code> schema.org markup to each property page via <code>react-helmet-async</code>. Enables rich snippets in Google Search without any SSR requirement.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-blue"></div><div><strong>Replace AppContext with TanStack Query</strong> — Remove the "fetch everything on mount" pattern. Implement paginated queries with stale-while-revalidate. Critical for performance at 1K+ listings.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-blue"></div><div><strong>Add Sentry + Vercel Analytics</strong> — 30-minute setup each. You need real error data before launch, not after.</div></div>
+      </div>
+    </div>
+
+    <div class="sprint-week">
+      <div class="sprint-week-label" style="background: var(--gold); background: #7a5c00;">
+        <div class="sprint-week-num">W4</div>
+        <div class="sprint-week-name">Revenue</div>
+      </div>
+      <div class="sprint-week-content">
+        <div class="sprint-task"><div class="sprint-task-dot dot-gold"></div><div><strong>Razorpay integration</strong> — Replace mock PaymentPage with live Razorpay Checkout (API keys ready). Edge Function verifies payment signature server-side before setting <code>plan_type</code> and extending <code>expires_at</code>.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-gold"></div><div><strong>Plan selection UI</strong> — Replace the current single payment button with a 3-column Free / Featured / Premium plan selector. Show ranking boost benefit clearly.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-gold"></div><div><strong>Contact reveal credits</strong> — Wire reveal_credits to UI. Show "2 reveals remaining" on detail page. "Get more" CTA links to Razorpay credits purchase.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-gold"></div><div><strong>Owner Dashboard analytics</strong> — Add view_count graph, inquiry count, days remaining badge, and "Upgrade Plan" CTA to the dashboard. Owners need to see ROI.</div></div>
+        <div class="sprint-task"><div class="sprint-task-dot dot-gold"></div><div><strong>Launch checklist</strong> — Custom domain on Vercel, Google Search Console setup, test full owner + tenant flow end-to-end in production, confirm Razorpay webhooks firing correctly.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-row" style="margin-top: 48px;">
+    <div class="stat-cell"><div class="num rust">4</div><div class="lbl">Weeks to Ship</div></div>
+    <div class="stat-cell"><div class="num rust">7</div><div class="lbl">New DB Tables</div></div>
+    <div class="stat-cell"><div class="num rust">3</div><div class="lbl">Edge Functions</div></div>
+    <div class="stat-cell"><div class="num rust">0</div><div class="lbl">Monthly Infra Cost</div></div>
+  </div>
+
+  <div class="callout callout-forest" style="margin-top: 32px;">
+    <strong>The Architect's Final Word</strong>
+    <p>You have built a better foundation than most funded startups have at their seed round. The React + Supabase + Vercel stack scales to millions of users on free tiers. The ranking algorithm is sound. The schema is clean. What you need now isn't a rewrite — it's trust infrastructure (security fixes), growth infrastructure (SEO meta tags + sitemap), and revenue infrastructure (Razorpay + plans). In that exact order. Ship Week 1 fixes before you tell anyone the product exists. Everything else can iterate. Security cannot.</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════ FOOTER ════════════════════════════ -->
+<footer style="background: var(--ink); color: var(--paper); padding: 48px 60px; text-align: center;">
+  <div style="font-family: var(--serif); font-size: 32px; margin-bottom: 12px; color: #a8c8b0; font-style: italic;">TownHall</div>
+  <div style="font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(245,240,232,0.35);">
+    Production Architecture Blueprint · Senior Architect Review · 2026
+  </div>
+  <div style="margin-top: 24px; font-size: 13px; color: rgba(245,240,232,0.4);">
+    React · Vite · Supabase · Vercel · Razorpay · Resend · Cloudinary · Leaflet · TanStack Query
+  </div>
+</footer>
+
+</body>
+</html>

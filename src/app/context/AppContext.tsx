@@ -14,8 +14,8 @@ export interface Property {
   amenities: string[];
   ownerId: string;
   ownerName: string;
-  ownerPhone: string;
-  status: 'pending' | 'active' | 'expired';
+  ownerPhone?: string;
+  status: 'pending' | 'active' | 'expired' | 'flagged';
   paymentStatus: 'pending' | 'paid';
   createdAt: Date;
   expiresAt: Date;
@@ -41,6 +41,17 @@ export interface User {
   avatarUrl?: string;
 }
 
+export interface Profile {
+  id: string;
+  role: 'tenant' | 'owner' | 'both' | null;
+  phone: string | null;
+  city: string | null;
+  onboarding_complete: boolean;
+  reveal_credits: number;
+  is_verified_owner: boolean;
+  created_at: string;
+}
+
 function mapSupabaseUser(supabaseUser: SupabaseUser): User {
   const meta = supabaseUser.user_metadata ?? {};
   return {
@@ -55,10 +66,12 @@ function mapSupabaseUser(supabaseUser: SupabaseUser): User {
 interface AppContextType {
   user: User | null;
   loading: boolean;
+  profile: Profile | null;
+  profileLoading: boolean;
   properties: Property[];
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-  addProperty: (property: Omit<Property, 'id' | 'ownerId' | 'status' | 'paymentStatus' | 'createdAt' | 'expiresAt'>) => Promise<string>;
+  addProperty: (property: Omit<Property, 'id' | 'ownerId' | 'status' | 'paymentStatus' | 'createdAt' | 'expiresAt' | 'ownerPhone'>) => Promise<string>;
   updatePropertyPayment: (propertyId: string) => Promise<void>;
   deleteProperty: (propertyId: string) => Promise<void>;
   getUserProperties: () => Property[];
@@ -70,6 +83,8 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [properties, setProperties] = useState<Property[]>([]);
 
   // Fetch properties from Supabase
@@ -105,7 +120,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           viewCount: p.view_count ?? 0,
           ownerId: p.owner_id,
           ownerName: p.owner_name,
-          ownerPhone: p.owner_phone,
           status: p.status,
           paymentStatus: p.payment_status,
           createdAt: new Date(p.created_at),
@@ -113,24 +127,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }));
         setProperties(mappedProperties);
       }
-    } catch (error) {
-      console.error('Error fetching properties:', error);
+    } catch {
+      // silent — properties list stays as-is on transient errors
+    }
+  };
+
+  const fetchProfile = async (userId: string): Promise<void> => {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      setProfile(data ?? null);
+    } catch {
+      setProfile(null);
+    } finally {
+      setProfileLoading(false);
     }
   };
 
   useEffect(() => {
-    // Restore session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ? mapSupabaseUser(session.user) : null);
+      const supaUser = session?.user ?? null;
+      setUser(supaUser ? mapSupabaseUser(supaUser) : null);
       setLoading(false);
+      if (supaUser) {
+        fetchProfile(supaUser.id);
+      } else {
+        setProfileLoading(false);
+      }
     });
 
-    // Fetch properties on mount
     fetchProperties();
 
-    // Listen for auth state changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ? mapSupabaseUser(session.user) : null);
+      const supaUser = session?.user ?? null;
+      setUser(supaUser ? mapSupabaseUser(supaUser) : null);
+      if (supaUser) {
+        fetchProfile(supaUser.id);
+      } else {
+        setProfile(null);
+        setProfileLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -152,7 +191,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const addProperty = async (property: Omit<Property, 'id' | 'ownerId' | 'status' | 'paymentStatus' | 'createdAt' | 'expiresAt'>) => {
+  const addProperty = async (property: Omit<Property, 'id' | 'ownerId' | 'status' | 'paymentStatus' | 'createdAt' | 'expiresAt' | 'ownerPhone'>) => {
     if (!user) throw new Error('User must be logged in to add property');
     
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -179,7 +218,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         longitude: property.longitude,
         owner_id: user.id,
         owner_name: property.ownerName || user.name,
-        owner_phone: property.ownerPhone,
+        owner_phone: profile?.phone ?? null,
         status: 'pending',
         payment_status: 'pending',
         expires_at: expiresAt.toISOString(),
@@ -233,6 +272,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         loading,
+        profile,
+        profileLoading,
         properties,
         signInWithGoogle,
         logout,

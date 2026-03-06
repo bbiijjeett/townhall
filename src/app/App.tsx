@@ -12,6 +12,7 @@ import { AddPropertyPage } from './pages/AddPropertyPage';
 import { PropertyDetailPage } from './pages/PropertyDetailPage';
 import { PaymentPage } from './pages/PaymentPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { WelcomePage } from './pages/WelcomePage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { TermsOfServicePage } from './pages/TermsOfServicePage';
 import { CookiePolicyPage } from './pages/CookiePolicyPage';
@@ -27,6 +28,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/welcome" element={<WelcomePage />} />
             <Route path="/property/:id" element={<PropertyDetailPage />} />
             <Route path="/dashboard" element={
               <ProtectedRoute><OwnerDashboard /></ProtectedRoute>

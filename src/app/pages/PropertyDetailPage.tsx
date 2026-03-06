@@ -21,20 +21,18 @@ export function PropertyDetailPage() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showEnquiryForm, setShowEnquiryForm] = useState(false);
   const [showPhoneNumber, setShowPhoneNumber] = useState(false);
+  const [revealedPhone, setRevealedPhone]     = useState<string | null>(null);
+  const [isRevealingPhone, setIsRevealingPhone] = useState(false);
   const [enquiryName, setEnquiryName] = useState('');
   const [enquiryPhone, setEnquiryPhone] = useState('');
   const [enquiryMessage, setEnquiryMessage] = useState('');
 
-  // Increment view count once per page load (drives Engagement weight in ranking)
+  // Increment view count once per page load — rate-limited server-side via Upstash Redis
   useEffect(() => {
     if (!propertyId) return;
-    (async () => {
-      try {
-        await supabase.rpc('increment_property_view', { property_id: propertyId });
-      } catch (err) {
-        console.warn('Could not increment view count:', err);
-      }
-    })();
+    supabase.functions
+      .invoke('increment-view', { body: { property_id: propertyId } })
+      .catch(() => {}); // silent fail — never block UI for analytics
   }, [propertyId]);
 
   if (!property) {
@@ -59,43 +57,83 @@ export function PropertyDetailPage() {
     setShowEnquiryForm(true);
   };
 
-  const handleShowPhone = () => {
+  const handleShowPhone = async () => {
     if (!user) {
       toast.error('Please login to view phone number');
       navigate('/login');
       return;
     }
-    setShowPhoneNumber(true);
+    // Already revealed — just show it again without burning another credit
+    if (revealedPhone) {
+      setShowPhoneNumber(true);
+      return;
+    }
+    try {
+      setIsRevealingPhone(true);
+      const { data, error } = await supabase.rpc('reveal_owner_phone', {
+        p_property_id: propertyId,
+      });
+      if (error) {
+        if (error.message.includes('quota exceeded')) {
+          toast.error('Monthly reveal limit reached. Upgrade your plan for more reveals.');
+        } else {
+          toast.error('Could not retrieve phone number. Please try again.');
+        }
+        return;
+      }
+      setRevealedPhone(data as string);
+      setShowPhoneNumber(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not retrieve phone number');
+    } finally {
+      setIsRevealingPhone(false);
+    }
   };
 
-  const handleWhatsAppContact = () => {
+  const handleWhatsAppContact = async () => {
     if (!user) {
       toast.error('Please login to contact the owner');
       navigate('/login');
       return;
     }
-    
-    // Extract only numbers from phone
-    let phoneNumber = property.ownerPhone.replace(/[^0-9]/g, '');
-    
-    // If phone doesn't start with country code (91 for India), add it
+
+    // Re-use cached phone or reveal it first
+    let phone = revealedPhone;
+    if (!phone) {
+      try {
+        setIsRevealingPhone(true);
+        const { data, error } = await supabase.rpc('reveal_owner_phone', {
+          p_property_id: propertyId,
+        });
+        if (error) throw error;
+        phone = data as string;
+        setRevealedPhone(data as string);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not get owner contact');
+        return;
+      } finally {
+        setIsRevealingPhone(false);
+      }
+    }
+
+    if (!phone) {
+      toast.error('Owner phone number is not available');
+      return;
+    }
+
+    let phoneNumber = phone.replace(/[^0-9]/g, '');
     if (phoneNumber.length === 10 && !phoneNumber.startsWith('91')) {
       phoneNumber = '91' + phoneNumber;
     }
-    
-    // Validate phone number length
     if (phoneNumber.length < 10) {
       toast.error('Invalid phone number');
       return;
     }
-    
+
     const message = encodeURIComponent(
-      `Hi, I'm interested in your property: ${property.title}\n\nRent: ₹${property.rent.toLocaleString()}/month\nLocation: ${property.location}`
+      `Hi, I'm interested in your property: ${property.title}\n\nRent: ₹${property.rent.toLocaleString()}/month\nLocation: ${property.location}`,
     );
-    
-    // Open WhatsApp with the formatted number
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-    window.open(whatsappUrl, '_blank');
+    window.open(`https://wa.me/${phoneNumber}?text=${message}`, '_blank');
   };
 
   const handleShare = async () => {
@@ -283,27 +321,33 @@ export function PropertyDetailPage() {
                   {!showPhoneNumber ? (
                     <Button
                       onClick={handleShowPhone}
-                      className="w-full bg-indigo-600 hover:bg-indigo-700"
+                      disabled={isRevealingPhone}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60"
                     >
-                      <Phone className="w-4 h-4 mr-2" />
+                      {isRevealingPhone ? (
+                        <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                      ) : (
+                        <Phone className="w-4 h-4 mr-2" />
+                      )}
                       Show Phone Number
                     </Button>
                   ) : (
                     <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                       <p className="text-sm text-indigo-700 mb-1">Owner's Phone</p>
                       <a
-                        href={`tel:${property.ownerPhone}`}
+                        href={`tel:${revealedPhone}`}
                         className="text-xl font-bold text-indigo-900 hover:text-indigo-600 flex items-center"
                       >
                         <Phone className="w-5 h-5 mr-2" />
-                        {property.ownerPhone}
+                        {revealedPhone}
                       </a>
                     </div>
                   )}
                   
                   <Button
                     onClick={handleWhatsAppContact}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    disabled={isRevealingPhone}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-60"
                   >
                     <MessageCircle className="w-4 h-4 mr-2" />
                     WhatsApp Owner
