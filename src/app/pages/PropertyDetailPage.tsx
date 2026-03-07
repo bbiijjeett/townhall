@@ -167,8 +167,20 @@ export function PropertyDetailPage() {
     }
     try {
       setIsSubmittingInquiry(true);
+
+      // supabase.functions.invoke falls back to the anon key when the session has
+      // expired. Calling getSession() first forces an automatic token refresh via
+      // the refresh token, then we pass the access_token explicitly.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Your session has expired. Please sign in again.');
+        navigate('/login');
+        return;
+      }
+
       const { error } = await supabase.functions.invoke('send-inquiry-email', {
         body: { property_id: propertyId, message: enquiryMessage.trim() },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (error) throw error;
       toast.success('Enquiry sent! The owner will contact you soon.');

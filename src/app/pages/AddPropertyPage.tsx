@@ -109,10 +109,15 @@ export function AddPropertyPage() {
   const uploadToCloudinary = async (file: File): Promise<string> => {
     const folder = `townhall/${user!.id}`;
 
-    // 1. Get a short-lived signature from our Edge Function
+    // 1. Get a short-lived signature from our Edge Function.
+    // Explicitly pass the access_token so an expired-but-refreshable session
+    // never silently falls back to the anon key.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Session expired — please sign in again');
+
     const { data: sigData, error: sigError } = await supabase.functions.invoke(
       'sign-upload',
-      { body: { folder } },
+      { body: { folder }, headers: { Authorization: `Bearer ${session.access_token}` } },
     );
     if (sigError || !sigData?.data) throw new Error('Could not get upload signature');
 
