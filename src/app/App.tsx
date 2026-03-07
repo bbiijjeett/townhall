@@ -13,6 +13,7 @@ import { PropertyDetailPage } from './pages/PropertyDetailPage';
 import { PaymentPage } from './pages/PaymentPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { WelcomePage } from './pages/WelcomePage';
+import { SavedPropertiesPage } from './pages/SavedPropertiesPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { TermsOfServicePage } from './pages/TermsOfServicePage';
 import { CookiePolicyPage } from './pages/CookiePolicyPage';
@@ -41,6 +42,9 @@ export default function App() {
             } />
             <Route path="/payment/:id" element={
               <ProtectedRoute><PaymentPage /></ProtectedRoute>
+            } />
+            <Route path="/saved" element={
+              <ProtectedRoute><SavedPropertiesPage /></ProtectedRoute>
             } />
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route path="/terms-of-service" element={<TermsOfServicePage />} />

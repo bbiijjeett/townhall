@@ -1,4 +1,4 @@
-import { MapPin, BedDouble, CheckCircle2 } from 'lucide-react';
+import { MapPin, BedDouble, CheckCircle2, Heart } from 'lucide-react';
 import { Property } from '../context/AppContext';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
@@ -7,9 +7,11 @@ import { ImageWithFallback } from './figma/ImageWithFallback';
 interface PropertyCardProps {
   property: Property;
   onClick: () => void;
+  isSaved?: boolean;
+  onToggleSave?: (e: React.MouseEvent) => void;
 }
 
-export function PropertyCard({ property, onClick }: PropertyCardProps) {
+export function PropertyCard({ property, onClick, isSaved, onToggleSave }: PropertyCardProps) {
   return (
     <Card 
       className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
@@ -33,6 +35,15 @@ export function PropertyCard({ property, onClick }: PropertyCardProps) {
               Verified
             </Badge>
           </div>
+        )}
+        {onToggleSave !== undefined && (
+          <button
+            onClick={onToggleSave}
+            aria-label={isSaved ? 'Unsave property' : 'Save property'}
+            className="absolute bottom-3 right-3 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-md transition-all"
+          >
+            <Heart className={`w-4 h-4 ${isSaved ? 'text-red-500 fill-red-500' : 'text-gray-400'}`} />
+          </button>
         )}
       </div>
 

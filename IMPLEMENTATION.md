@@ -151,19 +151,19 @@ Before checking off any task:
 ## Part 4 — Inquiry System
 > Depends on: Part 1 (inquiries table), Part 2 (security), external: Resend account
 
-- [ ] Set up Resend account — get API key, add as `RESEND_API_KEY` in Supabase Edge Function secrets
-- [ ] Create Supabase Edge Function `send-inquiry-email` — triggered by Supabase Realtime webhook or called directly; sends email to owner via Resend with tenant name, message, and property link
-- [ ] Add inquiry modal to `PropertyDetailPage` — form with fields: name (pre-filled from profile), message (textarea, 500 char limit). On submit: INSERT into `inquiries`, call `send-inquiry-email` Edge Function
-- [ ] Update `OwnerDashboard` — show list of inquiries per listing with `status` badge (pending / seen / replied), mark as seen on open
+- [x] Set up Resend account — get API key, add as `RESEND_API_KEY` in Supabase Edge Function secrets
+- [x] Create Supabase Edge Function `send-inquiry-email` — triggered by Supabase Realtime webhook or called directly; sends email to owner via Resend with tenant name, message, and property link
+- [x] Add inquiry modal to `PropertyDetailPage` — form with fields: name (pre-filled from profile), message (textarea, 500 char limit). On submit: INSERT into `inquiries`, call `send-inquiry-email` Edge Function
+- [x] Update `OwnerDashboard` — show list of inquiries per listing with `status` badge (pending / seen / replied), mark as seen on open
 
 ---
 
 ## Part 5 — Saved Properties (Wishlist)
 > Depends on: Part 1 (saved_properties table)
 
-- [ ] Add heart/bookmark icon button to `PropertyCard` — calls `INSERT INTO saved_properties` on click (requires auth, prompt sign-in if not logged in). Toggle state: filled if saved, outline if not
-- [ ] Create `/saved` page — fetches all `saved_properties` for current user with joined property data. Renders property cards with unsave button
-- [ ] Add `/saved` to `BottomNav` and `Navbar` (only when logged in)
+- [x] Add heart/bookmark icon button to `PropertyCard` — calls `INSERT INTO saved_properties` on click (requires auth, prompt sign-in if not logged in). Toggle state: filled if saved, outline if not
+- [x] Create `/saved` page — fetches all `saved_properties` for current user with joined property data. Renders property cards with unsave button
+- [x] Add `/saved` to `BottomNav` and `Navbar` (only when logged in)
 
 ---
 

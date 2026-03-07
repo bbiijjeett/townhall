@@ -3,16 +3,19 @@ import { Search, Plus, ArrowUpDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { computeListingScore } from '../../lib/rankingScore';
 import { useApp } from '../context/AppContext';
+import { useSavedProperties } from '../hooks/useSavedProperties';
 import { PropertyCard } from '../components/PropertyCard';
 import { FilterBar, FilterOptions } from '../components/FilterBar';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
+import { toast } from 'sonner';
 import heroBg from '../../assets/hero.png';
 
 export function LandingPage() {
   const navigate = useNavigate();
   const { properties, user } = useApp();
+  const { isSaved, toggleSave } = useSavedProperties();
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<FilterOptions>({
     bhk: [],
@@ -78,6 +81,16 @@ export function LandingPage() {
     { label: 'Under ₹10k', value: 'Under ₹10k' },
     { label: 'Under ₹15k', value: 'Under ₹15k' },
   ];
+
+  const handleToggleSave = async (propertyId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.info('Please sign in to save properties');
+      navigate('/login');
+      return;
+    }
+    await toggleSave(propertyId);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 lg:pb-0">
@@ -174,6 +187,8 @@ export function LandingPage() {
               key={property.id}
               property={property}
               onClick={() => navigate('/property/' + property.id)}
+              isSaved={isSaved(property.id)}
+              onToggleSave={(e) => handleToggleSave(property.id, e)}
             />
           ))}
         </div>

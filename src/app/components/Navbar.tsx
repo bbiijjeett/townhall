@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Home, LogOut, LayoutDashboard, Plus, User as UserIcon, MapPin, Loader2 } from 'lucide-react';
+import { Home, LogOut, LayoutDashboard, Plus, User as UserIcon, MapPin, Loader2, Bookmark } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Button } from './ui/button';
@@ -125,6 +125,10 @@ export function Navbar() {
                   <DropdownMenuItem onClick={() => navigate('/')}>
                     <Home className="mr-2 h-4 w-4" />
                     <span>Browse Properties</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/saved')}>
+                    <Bookmark className="mr-2 h-4 w-4" />
+                    <span>Saved Properties</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">

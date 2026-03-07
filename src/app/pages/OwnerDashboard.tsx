@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, IndianRupee, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Plus, IndianRupee, Clock, CheckCircle, XCircle, Trash2, MessageSquare, ChevronDown } from 'lucide-react';
+import { useOwnerInquiries } from '../hooks/useOwnerInquiries';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Button } from '../components/ui/button';
@@ -13,6 +14,7 @@ export function OwnerDashboard() {
   const navigate = useNavigate();
   const { user, getUserProperties, deleteProperty } = useApp();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
+  const [expandedInquiries, setExpandedInquiries] = useState<string | null>(null);
   
   if (!user) {
     return (
@@ -29,6 +31,7 @@ export function OwnerDashboard() {
   }
 
   const properties = getUserProperties();
+  const { inquiries, markAsSeen } = useOwnerInquiries(user.id);
 
   const handleDelete = async (propertyId: string) => {
     try {
@@ -185,6 +188,66 @@ export function OwnerDashboard() {
                     )}
                   </div>
                 </div>
+                {/* Inquiries expandable section */}
+                {(() => {
+                  const listingInquiries = inquiries.filter(i => i.property_id === property.id);
+                  if (listingInquiries.length === 0) return null;
+                  const pendingCount = listingInquiries.filter(i => i.status === 'pending').length;
+                  const isExpanded = expandedInquiries === property.id;
+                  return (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const opening = expandedInquiries !== property.id;
+                          setExpandedInquiries(opening ? property.id : null);
+                          if (opening) {
+                            listingInquiries
+                              .filter(i => i.status === 'pending')
+                              .forEach(i => markAsSeen(i.id));
+                          }
+                        }}
+                        className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        {listingInquiries.length} {listingInquiries.length === 1 ? 'Inquiry' : 'Inquiries'}
+                        {pendingCount > 0 && (
+                          <span className="bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
+                            {pendingCount} new
+                          </span>
+                        )}
+                        <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                      {isExpanded && (
+                        <div className="mt-3 space-y-2">
+                          {listingInquiries.map(inquiry => (
+                            <div key={inquiry.id} className="p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{inquiry.tenant_name}</p>
+                                  <p className="text-xs text-gray-500">{inquiry.tenant_email}</p>
+                                </div>
+                                <Badge
+                                  className={
+                                    inquiry.status === 'pending'
+                                      ? 'bg-amber-100 text-amber-800 hover:bg-amber-100 text-xs'
+                                      : 'bg-gray-100 text-gray-600 hover:bg-gray-100 text-xs'
+                                  }
+                                >
+                                  {inquiry.status}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-700">{inquiry.message}</p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                {new Date(inquiry.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </Card>
             ))}
           </div>

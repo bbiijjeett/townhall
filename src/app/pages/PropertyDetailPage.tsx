@@ -23,9 +23,9 @@ export function PropertyDetailPage() {
   const [showPhoneNumber, setShowPhoneNumber] = useState(false);
   const [revealedPhone, setRevealedPhone]     = useState<string | null>(null);
   const [isRevealingPhone, setIsRevealingPhone] = useState(false);
-  const [enquiryName, setEnquiryName] = useState('');
-  const [enquiryPhone, setEnquiryPhone] = useState('');
-  const [enquiryMessage, setEnquiryMessage] = useState('');
+  const [enquiryName, setEnquiryName]           = useState(user?.name ?? '');
+  const [enquiryMessage, setEnquiryMessage]     = useState('');
+  const [isSubmittingInquiry, setIsSubmittingInquiry] = useState(false);
 
   // Increment view count once per page load — rate-limited server-side via Upstash Redis
   useEffect(() => {
@@ -155,17 +155,30 @@ export function PropertyDetailPage() {
     }
   };
 
-  const handleSubmitEnquiry = (e: React.FormEvent) => {
+  const handleSubmitEnquiry = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!enquiryName || !enquiryPhone || !enquiryMessage) {
-      toast.error('Please fill in all fields');
+    if (!enquiryName.trim()) {
+      toast.error('Please enter your name');
       return;
     }
-    toast.success('Enquiry sent successfully! The owner will contact you soon.');
-    setShowEnquiryForm(false);
-    setEnquiryName('');
-    setEnquiryPhone('');
-    setEnquiryMessage('');
+    if (enquiryMessage.trim().length < 5) {
+      toast.error('Message must be at least 5 characters');
+      return;
+    }
+    try {
+      setIsSubmittingInquiry(true);
+      const { error } = await supabase.functions.invoke('send-inquiry-email', {
+        body: { property_id: propertyId, message: enquiryMessage.trim() },
+      });
+      if (error) throw error;
+      toast.success('Enquiry sent! The owner will contact you soon.');
+      setShowEnquiryForm(false);
+      setEnquiryMessage('');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send enquiry. Please try again.');
+    } finally {
+      setIsSubmittingInquiry(false);
+    }
   };
 
   const nextImage = () => {
@@ -353,14 +366,14 @@ export function PropertyDetailPage() {
                     WhatsApp Owner
                   </Button>
                   
-                  {/* <Button
+                  <Button
                     onClick={handleContactOwner}
                     variant="outline"
                     className="w-full border-indigo-600 text-indigo-600 hover:bg-indigo-50"
                   >
                     <MessageCircle className="w-4 h-4 mr-2" />
                     Send Enquiry
-                  </Button> */}
+                  </Button>
 
                   {/* Share Button */}
                   <Button
@@ -407,28 +420,26 @@ export function PropertyDetailPage() {
                 value={enquiryName}
                 onChange={(e) => setEnquiryName(e.target.value)}
                 className="mt-1"
+                disabled={isSubmittingInquiry}
               />
             </div>
             <div>
-              <Label htmlFor="enquiry-phone">Phone Number</Label>
-              <Input
-                id="enquiry-phone"
-                type="tel"
-                placeholder="+91 98765 43210"
-                value={enquiryPhone}
-                onChange={(e) => setEnquiryPhone(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="enquiry-message">Message</Label>
+              <Label htmlFor="enquiry-message">
+                Message
+                <span className="text-gray-400 font-normal ml-1 text-xs">(max 500 characters)</span>
+              </Label>
               <Textarea
                 id="enquiry-message"
-                placeholder="I'm interested in this property..."
+                placeholder="I'm interested in this property. Please share more details..."
                 value={enquiryMessage}
+                maxLength={500}
                 onChange={(e) => setEnquiryMessage(e.target.value)}
-                className="mt-1"
+                className="mt-1 min-h-28 resize-none"
+                disabled={isSubmittingInquiry}
               />
+              <p className={`text-xs mt-1 text-right ${enquiryMessage.length >= 450 ? 'text-amber-600' : 'text-gray-400'}`}>
+                {enquiryMessage.length}/500
+              </p>
             </div>
             <div className="flex gap-3">
               <Button
@@ -436,10 +447,18 @@ export function PropertyDetailPage() {
                 variant="outline"
                 onClick={() => setShowEnquiryForm(false)}
                 className="flex-1"
+                disabled={isSubmittingInquiry}
               >
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700">
+              <Button
+                type="submit"
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60"
+                disabled={isSubmittingInquiry}
+              >
+                {isSubmittingInquiry && (
+                  <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                )}
                 Send Enquiry
               </Button>
             </div>

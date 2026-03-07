@@ -2,6 +2,10 @@
 // Rate-limits view-count increments to once per IP per property per 24 hours
 // using Upstash Redis.  Falls back gracefully if Redis is unavailable.
 // POST { property_id: "<uuid>" }
+//
+// IMPORTANT: Deploy with "Verify JWT" DISABLED in the Dashboard.
+// This function is intentionally public — unauthenticated visitors should
+// also increment view counts.
 
 import { serve }        from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'

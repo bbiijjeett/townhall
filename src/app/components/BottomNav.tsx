@@ -1,4 +1,4 @@
-import { Home, Plus, User } from 'lucide-react';
+import { Home, Plus, User, Bookmark } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 
@@ -30,6 +30,18 @@ export function BottomNav() {
           >
             <Plus className="w-6 h-6" />
             <span className="text-xs">Post</span>
+          </button>
+        )}
+
+        {user && (
+          <button
+            onClick={() => navigate('/saved')}
+            className={`flex flex-col items-center justify-center flex-1 h-full space-y-1 ${
+              currentPath === '/saved' ? 'text-indigo-600' : 'text-gray-500'
+            }`}
+          >
+            <Bookmark className="w-6 h-6" />
+            <span className="text-xs">Saved</span>
           </button>
         )}
 
