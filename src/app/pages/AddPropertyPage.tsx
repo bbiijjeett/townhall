@@ -72,7 +72,7 @@ export function AddPropertyPage() {
     imageUrls: [],
     amenities: [],
     ownerName: user?.name || '',
-    area: ''
+    area: '',
     floor: '',
     totalFloors: '',
     availableFrom: new Date().toISOString().split('T')[0],
