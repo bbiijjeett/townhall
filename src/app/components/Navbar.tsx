@@ -92,6 +92,7 @@ export function Navbar() {
               </div>
             )}
             {user ? (
+              <>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center space-x-2 focus:outline-none">
@@ -161,6 +162,8 @@ export function Navbar() {
                 </DropdownMenuContent>
               </DropdownMenu>
               <BuyCreditsDialog open={showBuyCredits} onOpenChange={setShowBuyCredits} />
+              <BuyCreditsDialog open={showBuyCredits} onOpenChange={setShowBuyCredits} />
+            </>
             ) : (
               <Button
                 size="sm"
