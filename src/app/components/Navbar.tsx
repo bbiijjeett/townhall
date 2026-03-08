@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Home, LogOut, LayoutDashboard, Plus, User as UserIcon, MapPin, Loader2, Bookmark } from 'lucide-react';
+import { Home, LogOut, LayoutDashboard, Plus, User as UserIcon, MapPin, Loader2, Bookmark, Sparkles, Eye, ShoppingCart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { BuyCreditsDialog } from './BuyCreditsDialog';
 import { Button } from './ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import {
@@ -15,10 +16,11 @@ import {
 import { toast } from 'sonner';
 
 export function Navbar() {
-  const { user, logout } = useApp();
+  const { user, profile, logout } = useApp();
   const navigate = useNavigate();
   const [city, setCity] = useState<string | null>(null);
   const [cityLoading, setCityLoading] = useState(false);
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -111,6 +113,21 @@ export function Navbar() {
                       <p className="text-xs leading-none text-muted-foreground">
                         {user.email}
                       </p>
+                      {profile && (
+                        <div className="flex items-center gap-1 pt-1">
+                          {profile.reveal_unlimited ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                              <Sparkles className="w-3 h-3" />
+                              Unlimited reveals
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-2 py-0.5">
+                              <Eye className="w-3 h-3" />
+                              {profile.reveal_credits} reveal credit{profile.reveal_credits !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -130,6 +147,12 @@ export function Navbar() {
                     <Bookmark className="mr-2 h-4 w-4" />
                     <span>Saved Properties</span>
                   </DropdownMenuItem>
+                  {!profile?.reveal_unlimited && (
+                    <DropdownMenuItem onClick={() => setShowBuyCredits(true)}>
+                      <ShoppingCart className="mr-2 h-4 w-4 text-indigo-600" />
+                      <span className="text-indigo-600 font-medium">Buy Reveal Credits</span>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
@@ -137,6 +160,7 @@ export function Navbar() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <BuyCreditsDialog open={showBuyCredits} onOpenChange={setShowBuyCredits} />
             ) : (
               <Button
                 size="sm"

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, IndianRupee, Clock, CheckCircle, XCircle, Trash2, MessageSquare, ChevronDown, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Plus, IndianRupee, Clock, CheckCircle, XCircle, Trash2, MessageSquare, ChevronDown, RefreshCw, AlertTriangle, Eye, Sparkles, ShoppingCart } from 'lucide-react';
+import { BuyCreditsDialog } from '../components/BuyCreditsDialog';
 import { useOwnerInquiries } from '../hooks/useOwnerInquiries';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -12,9 +13,10 @@ import { toast } from 'sonner';
 
 export function OwnerDashboard() {
   const navigate = useNavigate();
-  const { user, getUserProperties, deleteProperty } = useApp();
+  const { user, profile, getUserProperties, deleteProperty } = useApp();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
   const [expandedInquiries, setExpandedInquiries] = useState<string | null>(null);
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
   
   if (!user) {
     return (
@@ -82,9 +84,36 @@ export function OwnerDashboard() {
     <div className="min-h-screen bg-gray-50 pb-20 lg:pb-0">
       <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">My Listings</h1>
-          <p className="text-gray-600 mt-2">Manage your rental properties</p>
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">My Listings</h1>
+            <p className="text-gray-600 mt-2">Manage your rental properties</p>
+          </div>
+          {profile && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Reveal credits:</span>
+              {profile.reveal_unlimited ? (
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
+                  <Sparkles className="w-4 h-4" />
+                  Unlimited this month
+                </span>
+              ) : (
+                <>
+                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1">
+                    <Eye className="w-4 h-4" />
+                    {profile.reveal_credits} credit{profile.reveal_credits !== 1 ? 's' : ''}
+                  </span>
+                  <button
+                    onClick={() => setShowBuyCredits(true)}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-full px-3 py-1 transition-colors"
+                  >
+                    <ShoppingCart className="w-4 h-4" />
+                    Buy Credits
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Add New Property Button */}
@@ -292,6 +321,8 @@ export function OwnerDashboard() {
             ))}
           </div>
         )}
+
+        <BuyCreditsDialog open={showBuyCredits} onOpenChange={setShowBuyCredits} />
 
         {/* Delete Confirmation Dialog */}
         <Dialog open={deleteDialog !== null} onOpenChange={() => setDeleteDialog(null)}>

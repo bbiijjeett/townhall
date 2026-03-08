@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
       }
 
       amount_paise = LISTING_AMOUNTS[planType];
-      receipt = `listing_${body.property_id}_${Date.now()}`;
+      receipt = `lst_${body.property_id.slice(0, 8)}_${Date.now().toString(36)}`;
       notes.property_id = body.property_id;
       notes.plan_type = planType;
 
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
         });
       }
       amount_paise = CREDITS_AMOUNTS[pack];
-      receipt = `credits_${user.id}_${Date.now()}`;
+      receipt = `crd_${user.id.slice(0, 8)}_${Date.now().toString(36)}`;
       notes.pack = pack;
 
     } else {

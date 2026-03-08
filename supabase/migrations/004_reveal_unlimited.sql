@@ -107,8 +107,8 @@ BEGIN
   END IF;
 
   -- Record the reveal
-  INSERT INTO public.contact_reveals (property_id, tenant_id, owner_id)
-  VALUES (p_property_id, v_tenant_id, v_owner_id);
+  INSERT INTO public.contact_reveals (property_id, tenant_id)
+  VALUES (p_property_id, v_tenant_id);
 
   -- Decrement reveal_credits only if not unlimited
   IF NOT v_is_unlimited THEN
