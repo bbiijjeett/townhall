@@ -367,44 +367,15 @@ export function PropertyDetailPage() {
                   )}
                 </div>
 
+                {user?.id === property.ownerId ? (
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600 text-center">
+                    This is your listing. Contact options are only visible to other users.
+                  </div>
+                ) : (
+                <>
                 <div className="space-y-3">
-                  {!showPhoneNumber ? (
-                    <>
-                      <Button
-                        onClick={handleShowPhone}
-                        disabled={isRevealingPhone}
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60"
-                      >
-                        {isRevealingPhone ? (
-                          <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
-                        ) : (
-                          <Phone className="w-4 h-4 mr-2" />
-                        )}
-                        Show Phone Number
-                      </Button>
-                      {/* Reveal quota counter */}
-                      {user && (
-                        profile?.reveal_unlimited ? (
-                          <p className="text-xs text-center text-green-600 flex items-center justify-center gap-1">
-                            <Sparkles className="w-3 h-3" />
-                            Unlimited reveals active
-                          </p>
-                        ) : revealsUsed !== null ? (
-                          <p className="text-xs text-center text-gray-500">
-                            {revealsUsed}/3 reveals used this month
-                            {revealsUsed >= 3 && (
-                              <button
-                                onClick={() => setShowBuyCredits(true)}
-                                className="ml-1 text-indigo-600 underline hover:text-indigo-800"
-                              >
-                                Get more
-                              </button>
-                            )}
-                          </p>
-                        ) : null
-                      )}
-                    </>
-                  ) : (
+                  {/* Phone revealed state — show number + action buttons */}
+                  {showPhoneNumber && (
                     <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                       <p className="text-sm text-indigo-700 mb-1">Owner's Phone</p>
                       <a
@@ -416,15 +387,52 @@ export function PropertyDetailPage() {
                       </a>
                     </div>
                   )}
-                  
-                  <Button
-                    onClick={handleWhatsAppContact}
-                    disabled={isRevealingPhone}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-60"
-                  >
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    WhatsApp Owner
-                  </Button>
+
+                  {/* Call + WhatsApp — always shown, reveal on first tap */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={handleShowPhone}
+                      disabled={isRevealingPhone}
+                      className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60"
+                    >
+                      {isRevealingPhone ? (
+                        <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                      ) : (
+                        <Phone className="w-4 h-4 mr-2" />
+                      )}
+                      Call
+                    </Button>
+                    <Button
+                      onClick={handleWhatsAppContact}
+                      disabled={isRevealingPhone}
+                      className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-60"
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      WhatsApp
+                    </Button>
+                  </div>
+
+                  {/* Reveal quota counter */}
+                  {user && (
+                    profile?.reveal_unlimited ? (
+                      <p className="text-xs text-center text-green-600 flex items-center justify-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        Unlimited reveals active
+                      </p>
+                    ) : revealsUsed !== null ? (
+                      <p className="text-xs text-center text-gray-500">
+                        {revealsUsed}/3 reveals used this month
+                        {revealsUsed >= 3 && (
+                          <button
+                            onClick={() => setShowBuyCredits(true)}
+                            className="ml-1 text-indigo-600 underline hover:text-indigo-800"
+                          >
+                            Get more
+                          </button>
+                        )}
+                      </p>
+                    ) : null
+                  )}
                   
                   <Button
                     onClick={handleContactOwner}
@@ -456,6 +464,7 @@ export function PropertyDetailPage() {
                     <span>Direct Owner Contact</span>
                   </div>
                 </div>
+                </> )} {/* end owner check */}
               </Card>
 
               
