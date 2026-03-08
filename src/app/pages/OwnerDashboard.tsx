@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, IndianRupee, Clock, CheckCircle, XCircle, Trash2, MessageSquare, ChevronDown } from 'lucide-react';
+import { Plus, IndianRupee, Clock, CheckCircle, XCircle, Trash2, MessageSquare, ChevronDown, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useOwnerInquiries } from '../hooks/useOwnerInquiries';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -70,6 +70,12 @@ export function OwnerDashboard() {
       default:
         return null;
     }
+  };
+
+  // Returns days remaining (positive = active, 0 = today, negative = overdue)
+  const getDaysRemaining = (expiresAt: Date | null | undefined): number | null => {
+    if (!expiresAt) return null;
+    return Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000);
   };
 
   return (
@@ -163,6 +169,16 @@ export function OwnerDashboard() {
                           Pay Listing Fee
                         </Button>
                       )}
+                      {property.status === 'expired' && (
+                        <Button
+                          size="sm"
+                          onClick={() => navigate('/payment/' + property.id)}
+                          className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                          <RefreshCw className="w-4 h-4 mr-1" />
+                          Renew Listing
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -181,11 +197,35 @@ export function OwnerDashboard() {
                       </Button>
                     </div>
 
-                    {property.status === 'active' && (
-                      <p className="text-sm text-gray-500">
-                        Expires on {property.expiresAt.toLocaleDateString()}
-                      </p>
-                    )}
+                    {property.status === 'active' && (() => {
+                      const days = getDaysRemaining(property.expiresAt);
+                      if (days === null) return null;
+                      if (days <= 0) return (
+                        <p className="text-sm font-medium text-red-600 flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          Expired — renew to restore visibility
+                        </p>
+                      );
+                      if (days <= 7) return (
+                        <p className="text-sm font-medium text-amber-600 flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          Expires in {days} day{days !== 1 ? 's' : ''} —{' '}
+                          <button
+                            type="button"
+                            onClick={() => navigate('/payment/' + property.id)}
+                            className="underline hover:no-underline"
+                          >
+                            renew now
+                          </button>
+                        </p>
+                      );
+                      return (
+                        <p className="text-sm text-gray-500">
+                          Expires on {property.expiresAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {' '}({days} days remaining)
+                        </p>
+                      );
+                    })()}
                   </div>
                 </div>
                 {/* Inquiries expandable section */}

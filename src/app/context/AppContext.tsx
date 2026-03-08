@@ -17,6 +17,7 @@ export interface Property {
   ownerPhone?: string;
   status: 'pending' | 'active' | 'expired' | 'flagged';
   paymentStatus: 'pending' | 'paid';
+  planType?: 'free' | 'featured' | 'premium';
   createdAt: Date;
   expiresAt: Date;
   // Additional fields
@@ -48,6 +49,7 @@ export interface Profile {
   city: string | null;
   onboarding_complete: boolean;
   reveal_credits: number;
+  reveal_unlimited: boolean;
   is_verified_owner: boolean;
   created_at: string;
 }
@@ -72,7 +74,7 @@ interface AppContextType {
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   addProperty: (property: Omit<Property, 'id' | 'ownerId' | 'status' | 'paymentStatus' | 'createdAt' | 'expiresAt' | 'ownerPhone'>) => Promise<string>;
-  updatePropertyPayment: (propertyId: string) => Promise<void>;
+  updatePropertyPayment: (propertyId: string, planType?: 'free' | 'featured' | 'premium') => Promise<void>;
   deleteProperty: (propertyId: string) => Promise<void>;
   getUserProperties: () => Property[];
   fetchProperties: () => Promise<void>;
@@ -118,6 +120,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           latitude: p.latitude,
           longitude: p.longitude,
           viewCount: p.view_count ?? 0,
+          planType: p.plan_type as 'free' | 'featured' | 'premium' | undefined,
           ownerId: p.owner_id,
           ownerName: p.owner_name,
           status: p.status,
@@ -235,12 +238,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return data.id;
   };
 
-  const updatePropertyPayment = async (propertyId: string) => {
+  const updatePropertyPayment = async (propertyId: string, planType: 'free' | 'featured' | 'premium' = 'free') => {
     const { error } = await supabase
       .from('properties')
       .update({
         payment_status: 'paid',
         status: 'active',
+        plan_type: planType,
       })
       .eq('id', propertyId);
 

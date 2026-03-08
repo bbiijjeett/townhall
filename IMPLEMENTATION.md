@@ -170,10 +170,10 @@ Before checking off any task:
 ## Part 6 — Listing Lifecycle Automation
 > Depends on: Part 1 (plan_type, expires_at on properties), Part 4 (Resend setup)
 
-- [ ] **Expiry cron job** — Enable `pg_cron` in Supabase. Create job: runs nightly at 00:00 IST. SQL: `UPDATE properties SET status = 'expired' WHERE expires_at < now() AND status = 'active'`
-- [ ] **Expiry trigger → email** — On status change to `'expired'`: call Edge Function `send-expiry-email` via Supabase Database Webhook. Resend email to owner with listing title, expiry date, and "Renew Now" CTA link
-- [ ] **7-day warning cron** — Second pg_cron job: runs daily, finds listings where `expires_at BETWEEN now() AND now() + interval '7 days'` and `status = 'active'`. Calls Edge Function `send-expiry-warning-email` via Resend with "Upgrade to Premium" CTA
-- [ ] **Free listing expiry** — Free listings: set `expires_at = created_at + interval '30 days'` on insert (can be done via a DB trigger on `properties` insert)
+- [x] **Expiry cron job** — Enable `pg_cron` in Supabase. Create job: runs nightly at 00:00 IST. SQL: `UPDATE properties SET status = 'expired' WHERE expires_at < now() AND status = 'active'`
+- [x] **Expiry trigger → email** — On status change to `'expired'`: call Edge Function `send-expiry-email` via Supabase Database Webhook. Resend email to owner with listing title, expiry date, and "Renew Now" CTA link
+- [x] **7-day warning cron** — Second pg_cron job: runs daily, finds listings where `expires_at BETWEEN now() AND now() + interval '7 days'` and `status = 'active'`. Calls Edge Function `send-expiry-warning-email` via Resend with "Upgrade to Premium" CTA
+- [x] **Free listing expiry** — Free listings: set `expires_at = created_at + interval '30 days'` on insert (can be done via a DB trigger on `properties` insert)
 
 ---
 
@@ -181,20 +181,20 @@ Before checking off any task:
 > Depends on: Part 1 (listing_plans table), Part 6 (expires_at logic)
 > Razorpay Live API keys are ready.
 
-- [ ] **Plan selection UI** — Replace the current `PaymentPage` single button with a 3-column plan selector: Free (₹0, 30 days) / Featured (₹199, 30 days, +30 ranking boost) / Premium (₹499, 60 days, top placement). Show benefits clearly per plan
-- [ ] **Razorpay Checkout integration** — On plan select (Featured or Premium): open Razorpay Checkout JS with correct `amount` and `order_id`. Pass listing ID in `notes`
-- [ ] **Edge Function `verify-payment`** — Receives `{razorpay_payment_id, razorpay_order_id, razorpay_signature, property_id, plan_type}`. Verifies HMAC signature server-side using `RAZORPAY_KEY_SECRET`. On success: `INSERT INTO listing_plans` with `status='verified'`, `UPDATE properties SET plan_type=..., expires_at=now()+interval`, `SET status='active'`
-- [ ] **Razorpay webhook** — Register `/api/razorpay-webhook` in Razorpay dashboard. Vercel serverless function that handles `payment.captured` event as a fallback in case checkout callback fails
-- [ ] **Renewal flow** — "Renew" button in `OwnerDashboard` and in expiry emails links to plan selection with the existing listing ID pre-selected. Same Razorpay flow, extends `expires_at` from `now()`
+- [x] **Plan selection UI** — Replace the current `PaymentPage` single button with a 3-column plan selector: Free (₹0, 30 days) / Featured (₹199, 30 days, +30 ranking boost) / Premium (₹499, 60 days, top placement). Show benefits clearly per plan
+- [x] **Razorpay Checkout integration** — On plan select (Featured or Premium): open Razorpay Checkout JS with correct `amount` and `order_id`. Pass listing ID in `notes`
+- [x] **Edge Function `verify-payment`** — Receives `{razorpay_payment_id, razorpay_order_id, razorpay_signature, property_id, plan_type}`. Verifies HMAC signature server-side using `RAZORPAY_KEY_SECRET`. On success: `INSERT INTO listing_plans` with `status='verified'`, `UPDATE properties SET plan_type=..., expires_at=now()+interval`, `SET status='active'`
+- [x] **Razorpay webhook** — Register `/api/razorpay-webhook` in Razorpay dashboard. Vercel serverless function that handles `payment.captured` event as a fallback in case checkout callback fails
+- [x] **Renewal flow** — "Renew" button in `OwnerDashboard` and in expiry emails links to plan selection with the existing listing ID pre-selected. Same Razorpay flow, extends `expires_at` from `now()`
 
 ---
 
 ## Part 8 — Contact Reveal Credits UI
 > Depends on: Part 2 (reveal_owner_phone RPC), Part 1 (profiles.reveal_credits), Part 7 (Razorpay)
 
-- [ ] Show "X reveals remaining this month" counter on `PropertyDetailPage` for logged-in tenants (count rows in `contact_reveals` for current month)
-- [ ] "Reveal Phone Number" button calls `reveal_owner_phone(property_id)` RPC — on success shows phone number inline; on quota exceeded shows "Buy more reveals" CTA
-- [ ] **Buy credits flow** — Razorpay Checkout for credits packs (₹49 / 10 credits or ₹149 / month unlimited). Edge Function `verify-credits-payment` on success updates `profiles.reveal_credits += 10` or sets unlimited flag
+- [x] Show "X reveals remaining this month" counter on `PropertyDetailPage` for logged-in tenants (count rows in `contact_reveals` for current month)
+- [x] "Reveal Phone Number" button calls `reveal_owner_phone(property_id)` RPC — on success shows phone number inline; on quota exceeded shows "Buy more reveals" CTA
+- [x] **Buy credits flow** — Razorpay Checkout for credits packs (₹49 / 10 credits or ₹149 / month unlimited). Edge Function `verify-credits-payment` on success updates `profiles.reveal_credits += 10` or sets unlimited flag
 
 ---
 

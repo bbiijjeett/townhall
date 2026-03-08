@@ -1,20 +1,99 @@
 import { useState } from 'react';
-import { CheckCircle, IndianRupee, CreditCard, Building2 } from 'lucide-react';
+import { CheckCircle, Star, Crown, Zap } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { supabase } from '../../lib/supabase';
+import { loadRazorpayScript } from '../../lib/razorpay';
+import type { RazorpayResponse } from '../../lib/razorpay';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Dialog, DialogContent } from '../components/ui/dialog';
+import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
+
+type PlanType = 'free' | 'featured' | 'premium';
+
+interface Plan {
+  id: PlanType;
+  name: string;
+  price: number;
+  duration: string;
+  durationDays: number;
+  description: string;
+  features: string[];
+  icon: React.ReactNode;
+  badgeColor: string;
+  buttonLabel: string;
+  highlight?: boolean;
+}
+
+const PLANS: Plan[] = [
+  {
+    id: 'free',
+    name: 'Free',
+    price: 0,
+    duration: '30 days',
+    durationDays: 30,
+    description: 'Get your property listed and reach tenants',
+    features: [
+      'Listed for 30 days',
+      'Verified Owner Badge',
+      'Search visibility',
+      'Direct enquiries',
+    ],
+    icon: <Zap className="w-6 h-6" />,
+    badgeColor: 'bg-gray-100 text-gray-700',
+    buttonLabel: 'Activate Free',
+  },
+  {
+    id: 'featured',
+    name: 'Featured',
+    price: 199,
+    duration: '30 days',
+    durationDays: 30,
+    description: 'Stand out in search results',
+    features: [
+      'Listed for 30 days',
+      'Verified Owner Badge',
+      '+30 ranking boost',
+      'Highlighted in search',
+      'Priority support',
+    ],
+    icon: <Star className="w-6 h-6" />,
+    badgeColor: 'bg-indigo-100 text-indigo-700',
+    buttonLabel: 'Pay ₹199',
+    highlight: true,
+  },
+  {
+    id: 'premium',
+    name: 'Premium',
+    price: 499,
+    duration: '60 days',
+    durationDays: 60,
+    description: 'Maximum visibility for twice as long',
+    features: [
+      'Listed for 60 days',
+      'Verified Owner Badge',
+      'Top placement in search',
+      'Highlighted in search',
+      'Priority listing badge',
+      'Priority support',
+    ],
+    icon: <Crown className="w-6 h-6" />,
+    badgeColor: 'bg-amber-100 text-amber-700',
+    buttonLabel: 'Pay ₹499',
+  },
+];
 
 export function PaymentPage() {
   const { id: propertyId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { properties, updatePropertyPayment } = useApp();
+  const { properties, user, updatePropertyPayment, fetchProperties } = useApp();
   const property = properties.find(p => p.id === propertyId);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isLoadingPayment, setIsLoadingPayment] = useState(false);
+  const [activatingPlan, setActivatingPlan] = useState<PlanType | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi' | 'netbanking'>('card');
+  const [successPlan, setSuccessPlan] = useState<PlanType>('free');
 
   if (!property) {
     return (
@@ -29,186 +108,241 @@ export function PaymentPage() {
     );
   }
 
-  const listingFee = 999;
-  const effectiveFee = 0; // Testing phase — free listing
+  const isRenewal = property.status === 'expired';
+  const pageTitle = isRenewal ? 'Renew Your Listing' : 'Choose Your Listing Plan';
 
-  const handlePayment = async () => {
+  const handleFreePlan = async () => {
+    setActivatingPlan('free');
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      await updatePropertyPayment(propertyId!);
-      setShowPaymentModal(false);
+      await updatePropertyPayment(propertyId!, 'free');
+      setSuccessPlan('free');
       setShowSuccessModal(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Payment failed';
-      toast.error(message);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to activate listing');
+    } finally {
+      setActivatingPlan(null);
+    }
+  };
+
+  const handlePaidPlan = async (planType: 'featured' | 'premium') => {
+    setActivatingPlan(planType);
+    setIsLoadingPayment(true);
+    try {
+      // 1. Refresh session — avoids 401 on stale tokens
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Your session has expired. Please sign in again.');
+        navigate('/login');
+        return;
+      }
+
+      // 2. Create Razorpay order server-side
+      const { data: orderData, error: orderError } = await supabase.functions.invoke(
+        'create-razorpay-order',
+        {
+          body: { type: 'listing', property_id: propertyId, plan_type: planType },
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        },
+      );
+
+      if (orderError || !orderData?.data) {
+        toast.error('Could not initiate payment. Please try again.');
+        return;
+      }
+
+      const { order_id, amount_paise, key_id } = orderData.data as {
+        order_id: string;
+        amount_paise: number;
+        key_id: string;
+      };
+
+      // 3. Load Razorpay checkout.js
+      await loadRazorpayScript();
+      setIsLoadingPayment(false);
+
+      // 4. Open Razorpay checkout
+      const plan = PLANS.find(p => p.id === planType)!;
+      const rzp = new window.Razorpay({
+        key: key_id,
+        amount: amount_paise,
+        currency: 'INR',
+        order_id,
+        name: 'TownHall',
+        description: `${plan.name} Listing — ${plan.duration}`,
+        notes: { property_id: propertyId!, plan_type: planType },
+        handler: async (response: RazorpayResponse) => {
+          // 5. Verify payment & activate listing
+          const { error: verifyError } = await supabase.functions.invoke('verify-payment', {
+            body: {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              property_id: propertyId,
+              plan_type: planType,
+            },
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+
+          if (verifyError) {
+            toast.error('Payment verification failed. Contact support if amount was deducted.');
+            return;
+          }
+
+          await fetchProperties();
+          setSuccessPlan(planType);
+          setShowSuccessModal(true);
+        },
+        prefill: {
+          name: user?.name,
+          email: user?.email,
+        },
+        theme: { color: '#4f46e5' },
+        modal: {
+          ondismiss: () => setActivatingPlan(null),
+        },
+      });
+
+      rzp.open();
+
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Payment failed. Please try again.');
+    } finally {
+      setIsLoadingPayment(false);
+      // activatingPlan is cleared by modal.ondismiss or success handler
+    }
+  };
+
+  const handlePlanSelect = (planType: PlanType) => {
+    if (planType === 'free') {
+      handleFreePlan();
+    } else {
+      handlePaidPlan(planType);
     }
   };
 
   const handleSuccessClose = () => {
     setShowSuccessModal(false);
+    setActivatingPlan(null);
     navigate('/owner-dashboard');
   };
 
+  const successPlanName = PLANS.find(p => p.id === successPlan)?.name ?? 'Free';
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20 lg:pb-0">
-      <div className="max-w-3xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        <Card className="p-6 sm:p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">Complete Your Listing</h1>
+      <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{pageTitle}</h1>
+          <p className="text-gray-600">Select the plan that best suits your needs for</p>
+          <p className="font-semibold text-gray-900">{property.title}</p>
+        </div>
 
-          {/* Property Summary */}
-          <Card className="bg-gray-50 p-6 mb-6">
-            <h2 className="font-semibold text-lg text-gray-900 mb-4">Property Details</h2>
-            <div className="space-y-2">
-              <p className="text-gray-700"><span className="font-medium">Title:</span> {property.title}</p>
-              <p className="text-gray-700"><span className="font-medium">Location:</span> {property.location}</p>
-              <p className="text-gray-700"><span className="font-medium">Type:</span> {property.bhk}</p>
-              <p className="text-gray-700"><span className="font-medium">Rent:</span> ₹{property.rent.toLocaleString()}/month</p>
-            </div>
-          </Card>
-
-          {/* Pricing Details */}
-          <div className="space-y-4 mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">Listing Fee</h2>
-            
-            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-6 border border-indigo-100">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-gray-700 mb-1">45 Days Premium Listing</p>
-                  <p className="text-sm text-gray-600">Get maximum visibility for your property</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg line-through text-gray-400">₹{listingFee}</p>
-                  <p className="text-3xl font-bold text-green-600">FREE</p>
-                  <p className="text-xs text-gray-500">Testing phase</p>
-                </div>
-              </div>
-
-              <div className="space-y-2 text-sm text-gray-700">
-                <div className="flex items-center">
-                  <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-                  <span>Verified Owner Badge</span>
-                </div>
-                <div className="flex items-center">
-                  <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-                  <span>Featured in Search Results</span>
-                </div>
-                <div className="flex items-center">
-                  <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-                  <span>Direct Contact Details Visible</span>
-                </div>
-                <div className="flex items-center">
-                  <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-                  <span>45 Days Active Listing</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-semibold text-gray-900">Total Amount</span>
-                <div className="text-right">
-                  <span className="text-sm line-through text-gray-400 mr-2">₹{listingFee}</span>
-                  <span className="text-2xl font-bold text-green-600">₹{effectiveFee}</span>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Free during testing phase</p>
-            </div>
+        {/* Property summary strip */}
+        <Card className="p-4 mb-8 bg-white flex flex-wrap gap-4 items-center justify-between">
+          <div>
+            <p className="text-sm text-gray-500">Location</p>
+            <p className="font-medium text-gray-900">{property.location}</p>
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/owner-dashboard')}
-              className="flex-1"
-            >
-              Pay Later
-            </Button>
-            <Button
-              onClick={() => setShowPaymentModal(true)}
-              className="flex-1 bg-green-600 hover:bg-green-700"
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Claim Now
-            </Button>
+          <div>
+            <p className="text-sm text-gray-500">Type</p>
+            <p className="font-medium text-gray-900">{property.bhk}</p>
           </div>
+          <div>
+            <p className="text-sm text-gray-500">Monthly Rent</p>
+            <p className="font-medium text-gray-900">₹{property.rent.toLocaleString()}</p>
+          </div>
+          {isRenewal && (
+            <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">
+              Renewal
+            </Badge>
+          )}
         </Card>
-      </div>
 
-      {/* Payment Modal */}
-      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
-        <DialogContent className="max-w-md">
-          <div className="p-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Select Payment Method</h2>
-
-            {/* Payment methods disabled during free/testing phase */}
-            <div className="space-y-3 mb-6 opacity-40 pointer-events-none select-none">
-              <Card className="p-4">
-                <div className="flex items-center">
-                  <CreditCard className="w-6 h-6 text-gray-400 mr-3" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-500">Credit / Debit Card</p>
-                    <p className="text-sm text-gray-400">Pay using your card</p>
-                  </div>
-                  <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
+        {/* Plan cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {PLANS.map((plan) => (
+            <Card
+              key={plan.id}
+              className={`p-6 flex flex-col relative transition-shadow ${
+                plan.highlight
+                  ? 'ring-2 ring-indigo-500 shadow-lg'
+                  : 'hover:shadow-md'
+              }`}
+            >
+              {plan.highlight && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-indigo-600 text-white hover:bg-indigo-600 text-xs px-3 py-1">
+                    Most Popular
+                  </Badge>
                 </div>
-              </Card>
+              )}
 
-              <Card className="p-4">
-                <div className="flex items-center">
-                  <IndianRupee className="w-6 h-6 text-gray-400 mr-3" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-500">UPI</p>
-                    <p className="text-sm text-gray-400">Pay using UPI apps</p>
-                  </div>
-                  <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`p-2 rounded-lg ${plan.badgeColor}`}>
+                  {plan.icon}
                 </div>
-              </Card>
-
-              <Card className="p-4">
-                <div className="flex items-center">
-                  <Building2 className="w-6 h-6 text-gray-400 mr-3" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-500">Net Banking</p>
-                    <p className="text-sm text-gray-400">Pay using internet banking</p>
-                  </div>
-                  <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
-                </div>
-              </Card>
-            </div>
-            <p className="text-xs text-center text-gray-400 -mt-3 mb-6">Payment not required during testing phase</p>
-
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-700">Amount to Pay</span>
-                <div className="text-right">
-                  <span className="text-sm line-through text-gray-400 mr-2">₹{listingFee}</span>
-                  <span className="text-2xl font-bold text-green-600">FREE</span>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-lg">{plan.name}</h3>
+                  <p className="text-xs text-gray-500">{plan.duration}</p>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-1">Free during testing phase</p>
-            </div>
 
-            <div className="flex gap-3">
+              {/* Price */}
+              <div className="mb-4">
+                {plan.price === 0 ? (
+                  <p className="text-3xl font-bold text-gray-900">Free</p>
+                ) : (
+                  <p className="text-3xl font-bold text-gray-900">
+                    ₹{plan.price}
+                    <span className="text-sm font-normal text-gray-500 ml-1">one-time</span>
+                  </p>
+                )}
+                <p className="text-sm text-gray-600 mt-1">{plan.description}</p>
+              </div>
+
+              {/* Features */}
+              <ul className="space-y-2 mb-6 flex-1">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-center text-sm text-gray-700">
+                    <CheckCircle className="w-4 h-4 text-green-600 mr-2 shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+
+              {/* CTA */}
               <Button
-                variant="outline"
-                onClick={() => setShowPaymentModal(false)}
-                className="flex-1"
+                onClick={() => handlePlanSelect(plan.id)}
+                disabled={isLoadingPayment || activatingPlan !== null}
+                className={`w-full ${
+                  plan.id === 'free'
+                    ? 'bg-gray-800 hover:bg-gray-900'
+                    : plan.highlight
+                    ? 'bg-indigo-600 hover:bg-indigo-700'
+                    : 'bg-amber-500 hover:bg-amber-600'
+                } disabled:opacity-60`}
               >
-                Cancel
+                {activatingPlan === plan.id ? (
+                  <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                ) : null}
+                {activatingPlan === plan.id ? 'Processing…' : plan.buttonLabel}
               </Button>
-              <Button
-                onClick={handlePayment}
-                className="flex-1 bg-green-600 hover:bg-green-700"
-              >
-                Claim Free Listing
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </Card>
+          ))}
+        </div>
+
+        {/* Skip / pay later */}
+        <div className="text-center">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/owner-dashboard')}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            Skip for now — activate later from dashboard
+          </Button>
+        </div>
+      </div>
 
       {/* Success Modal */}
       <Dialog open={showSuccessModal} onOpenChange={handleSuccessClose}>
@@ -217,9 +351,14 @@ export function PaymentPage() {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Listing Successful!</h2>
-            <p className="text-gray-600 mb-6">
-              Your property is now live and visible to potential tenants.
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              {isRenewal ? 'Listing Renewed!' : 'Listing Activated!'}
+            </h2>
+            <p className="text-gray-600 mb-1">
+              Your property is now live on the <strong>{successPlanName}</strong> plan.
+            </p>
+            <p className="text-gray-500 text-sm mb-6">
+              Tenants can now find and contact you directly.
             </p>
             <Button
               onClick={handleSuccessClose}

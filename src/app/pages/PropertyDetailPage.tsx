@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { MapPin, BedDouble, IndianRupee, Phone, MessageCircle, CheckCircle2, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
+import { MapPin, BedDouble, IndianRupee, Phone, MessageCircle, CheckCircle2, ChevronLeft, ChevronRight, Share2, Sparkles } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import { loadRazorpayScript } from '../../lib/razorpay';
+import type { RazorpayResponse } from '../../lib/razorpay';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -16,16 +18,33 @@ import { toast } from 'sonner';
 export function PropertyDetailPage() {
   const { id: propertyId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { properties, user } = useApp();
+  const { properties, user, profile } = useApp();
   const property = properties.find(p => p.id === propertyId);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showEnquiryForm, setShowEnquiryForm] = useState(false);
   const [showPhoneNumber, setShowPhoneNumber] = useState(false);
   const [revealedPhone, setRevealedPhone]     = useState<string | null>(null);
   const [isRevealingPhone, setIsRevealingPhone] = useState(false);
+  const [revealsUsed, setRevealsUsed]         = useState<number | null>(null);
+  const [showBuyCredits, setShowBuyCredits]   = useState(false);
+  const [isBuyingCredits, setIsBuyingCredits] = useState(false);
   const [enquiryName, setEnquiryName]           = useState(user?.name ?? '');
   const [enquiryMessage, setEnquiryMessage]     = useState('');
   const [isSubmittingInquiry, setIsSubmittingInquiry] = useState(false);
+
+  // Fetch the number of phone reveals used this calendar month
+  useEffect(() => {
+    if (!user || profile?.reveal_unlimited) return;
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    supabase
+      .from('contact_reveals')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', user.id)
+      .gte('created_at', monthStart.toISOString())
+      .then(({ count }) => setRevealsUsed(count ?? 0));
+  }, [user?.id, profile?.reveal_unlimited]);
 
   // Increment view count once per page load — rate-limited server-side via Upstash Redis
   useEffect(() => {
@@ -75,7 +94,7 @@ export function PropertyDetailPage() {
       });
       if (error) {
         if (error.message.includes('quota exceeded')) {
-          toast.error('Monthly reveal limit reached. Upgrade your plan for more reveals.');
+          setShowBuyCredits(true);
         } else {
           toast.error('Could not retrieve phone number. Please try again.');
         }
@@ -87,6 +106,97 @@ export function PropertyDetailPage() {
       toast.error(err instanceof Error ? err.message : 'Could not retrieve phone number');
     } finally {
       setIsRevealingPhone(false);
+    }
+  };
+
+  const handleBuyCredits = async (pack: '10credits' | 'unlimited') => {
+    setIsBuyingCredits(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Your session has expired. Please sign in again.');
+        navigate('/login');
+        return;
+      }
+
+      const { data: orderData, error: orderError } = await supabase.functions.invoke(
+        'create-razorpay-order',
+        {
+          body: { type: 'credits', pack },
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        },
+      );
+
+      if (orderError || !orderData?.data) {
+        toast.error('Could not initiate payment. Please try again.');
+        return;
+      }
+
+      const { order_id, amount_paise, key_id } = orderData.data as {
+        order_id: string;
+        amount_paise: number;
+        key_id: string;
+      };
+
+      await loadRazorpayScript();
+      setIsBuyingCredits(false);
+
+      setShowBuyCredits(false); // close modal before opening Razorpay
+
+      const rzp = new window.Razorpay({
+        key: key_id,
+        amount: amount_paise,
+        currency: 'INR',
+        order_id,
+        name: 'TownHall',
+        description: pack === 'unlimited' ? 'Unlimited Reveals — This Month' : '10 Reveal Credits',
+        notes: { pack, user_id: user!.id },
+        handler: async (response: RazorpayResponse) => {
+          const { data: verifyData, error: verifyError } = await supabase.functions.invoke(
+            'verify-credits-payment',
+            {
+              body: {
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                pack,
+              },
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            },
+          );
+
+          if (verifyError) {
+            toast.error('Payment verification failed. Contact support if amount was deducted.');
+            return;
+          }
+
+          const result = verifyData?.data as { reveal_credits: number; reveal_unlimited: boolean } | undefined;
+          if (result?.reveal_unlimited) {
+            toast.success('Unlimited reveals activated! You can now view all owner contacts this month.');
+            // Profile will be refreshed on next auth state update;
+            // update local counter display instantly
+            setRevealsUsed(null);
+          } else {
+            const added = pack === '10credits' ? 10 : 0;
+            toast.success(`${added} reveal credits added to your account!`);
+            setRevealsUsed(prev => Math.max(0, (prev ?? 0) - 0)); // reset display
+          }
+        },
+        prefill: {
+          name: user?.name,
+          email: user?.email,
+        },
+        theme: { color: '#4f46e5' },
+        modal: {
+          ondismiss: () => setIsBuyingCredits(false),
+        },
+      });
+
+      rzp.open();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Payment failed. Please try again.');
+    } finally {
+      setIsBuyingCredits(false);
     }
   };
 
@@ -344,18 +454,41 @@ export function PropertyDetailPage() {
 
                 <div className="space-y-3">
                   {!showPhoneNumber ? (
-                    <Button
-                      onClick={handleShowPhone}
-                      disabled={isRevealingPhone}
-                      className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60"
-                    >
-                      {isRevealingPhone ? (
-                        <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
-                      ) : (
-                        <Phone className="w-4 h-4 mr-2" />
+                    <>
+                      <Button
+                        onClick={handleShowPhone}
+                        disabled={isRevealingPhone}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60"
+                      >
+                        {isRevealingPhone ? (
+                          <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                        ) : (
+                          <Phone className="w-4 h-4 mr-2" />
+                        )}
+                        Show Phone Number
+                      </Button>
+                      {/* Reveal quota counter */}
+                      {user && (
+                        profile?.reveal_unlimited ? (
+                          <p className="text-xs text-center text-green-600 flex items-center justify-center gap-1">
+                            <Sparkles className="w-3 h-3" />
+                            Unlimited reveals active
+                          </p>
+                        ) : revealsUsed !== null ? (
+                          <p className="text-xs text-center text-gray-500">
+                            {revealsUsed}/3 reveals used this month
+                            {revealsUsed >= 3 && (
+                              <button
+                                onClick={() => setShowBuyCredits(true)}
+                                className="ml-1 text-indigo-600 underline hover:text-indigo-800"
+                              >
+                                Get more
+                              </button>
+                            )}
+                          </p>
+                        ) : null
                       )}
-                      Show Phone Number
-                    </Button>
+                    </>
                   ) : (
                     <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                       <p className="text-sm text-indigo-700 mb-1">Owner's Phone</p>
@@ -415,6 +548,61 @@ export function PropertyDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Buy Credits Dialog */}
+      <Dialog open={showBuyCredits} onOpenChange={setShowBuyCredits}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Get More Reveal Credits</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 mb-4">
+            You've used all 3 of your free monthly reveals. Purchase more to view owner contacts.
+          </p>
+          <div className="space-y-3">
+            {/* 10 Credits pack */}
+            <button
+              onClick={() => handleBuyCredits('10credits')}
+              disabled={isBuyingCredits}
+              className="w-full text-left p-4 rounded-lg border-2 border-indigo-200 hover:border-indigo-500 hover:bg-indigo-50 transition-colors disabled:opacity-50"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-gray-900">10 Reveal Credits</p>
+                  <p className="text-sm text-gray-500">View up to 10 more owner contacts</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-indigo-600">₹49</p>
+                  <p className="text-xs text-gray-400">one-time</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Unlimited pack */}
+            <button
+              onClick={() => handleBuyCredits('unlimited')}
+              disabled={isBuyingCredits}
+              className="w-full text-left p-4 rounded-lg border-2 border-amber-200 hover:border-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-50 relative"
+            >
+              <div className="absolute -top-2 right-3">
+                <span className="bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">Best Value</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-gray-900">Unlimited Reveals</p>
+                  <p className="text-sm text-gray-500">No limit for the rest of this month</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-amber-600">₹149</p>
+                  <p className="text-xs text-gray-400">this month</p>
+                </div>
+              </div>
+            </button>
+          </div>
+          {isBuyingCredits && (
+            <p className="text-sm text-center text-gray-500 mt-2">Opening payment…</p>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Enquiry Form Dialog */}
       <Dialog open={showEnquiryForm} onOpenChange={setShowEnquiryForm}>
