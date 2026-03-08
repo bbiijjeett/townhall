@@ -33,9 +33,12 @@ function freshnessScore(property: Property): number {
 }
 
 // ─── 2. Paid Boost (0 – 30 pts) ──────────────────────────────────────────────
-// Flat bonus for listings whose payment has been confirmed.
+// Premium > Featured > Free/unpaid so paid tiers surface above each other.
 function paidBoostScore(property: Property): number {
-  return property.paymentStatus === 'paid' ? 30 : 0;
+  if (property.paymentStatus !== 'paid') return 0;
+  if (property.planType === 'premium')  return 30;
+  if (property.planType === 'featured') return 20;
+  return 10; // free paid tier
 }
 
 // ─── 3. Engagement (0 – 20 pts) ──────────────────────────────────────────────

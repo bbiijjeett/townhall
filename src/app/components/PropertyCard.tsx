@@ -1,4 +1,4 @@
-import { MapPin, BedDouble, CheckCircle2, Heart } from 'lucide-react';
+import { MapPin, BedDouble, CheckCircle2, Heart, Sparkles, Star } from 'lucide-react';
 import { Property } from '../context/AppContext';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
@@ -12,9 +12,15 @@ interface PropertyCardProps {
 }
 
 export function PropertyCard({ property, onClick, isSaved, onToggleSave }: PropertyCardProps) {
+  const isPremium  = property.planType === 'premium'  && property.paymentStatus === 'paid';
+  const isFeatured = property.planType === 'featured' && property.paymentStatus === 'paid';
+
   return (
-    <Card 
-      className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+    <Card
+      className={`overflow-hidden cursor-pointer hover:shadow-lg transition-shadow ${
+        isPremium  ? 'ring-2 ring-indigo-500 shadow-indigo-100 shadow-md' :
+        isFeatured ? 'ring-2 ring-amber-400 shadow-amber-100 shadow-md' : ''
+      }`}
       onClick={onClick}
     >
       <div className="relative aspect-video overflow-hidden">
@@ -28,14 +34,27 @@ export function PropertyCard({ property, onClick, isSaved, onToggleSave }: Prope
             {property.bhk}
           </Badge>
         </div>
-        {property.status === 'active' && (
-          <div className="absolute top-3 right-3">
+        {/* Plan badge — top right */}
+        <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+          {isPremium && (
+            <Badge className="bg-indigo-600 text-white hover:bg-indigo-700">
+              <Star className="w-3 h-3 mr-1 fill-white" />
+              Premium
+            </Badge>
+          )}
+          {isFeatured && (
+            <Badge className="bg-amber-500 text-white hover:bg-amber-600">
+              <Sparkles className="w-3 h-3 mr-1" />
+              Featured
+            </Badge>
+          )}
+          {property.status === 'active' && !isPremium && !isFeatured && (
             <Badge className="bg-green-600 text-white hover:bg-green-700">
               <CheckCircle2 className="w-3 h-3 mr-1" />
               Verified
             </Badge>
-          </div>
-        )}
+          )}
+        </div>
         {onToggleSave !== undefined && (
           <button
             onClick={onToggleSave}
