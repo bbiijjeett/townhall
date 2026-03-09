@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, IndianRupee, Clock, CheckCircle, XCircle, Trash2, MessageSquare, ChevronDown, RefreshCw, AlertTriangle, Eye, Sparkles, ShoppingCart } from 'lucide-react';
+import { Plus, IndianRupee, Clock, CheckCircle, XCircle, Trash2, MessageSquare, ChevronDown, RefreshCw, AlertTriangle, Eye, Sparkles, ShoppingCart, ArrowUpCircle } from 'lucide-react';
 import { BuyCreditsDialog } from '../components/BuyCreditsDialog';
 import { useOwnerInquiries } from '../hooks/useOwnerInquiries';
 import { useNavigate } from 'react-router-dom';
@@ -160,13 +160,30 @@ export function OwnerDashboard() {
                         <h3 className="text-xl font-semibold text-gray-900">{property.title}</h3>
                         <p className="text-gray-600 text-sm">{property.location}</p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         {getStatusBadge(property.status)}
                         <Badge variant="outline">{property.bhk}</Badge>
+                        {/* Inquiry count badge */}
+                        {(() => {
+                          const propertyInquiries = inquiries.filter(i => i.property_id === property.id);
+                          const pendingCount = propertyInquiries.filter(i => i.status === 'pending').length;
+                          if (propertyInquiries.length === 0) return null;
+                          return (
+                            <Badge className={pendingCount > 0 ? 'bg-amber-100 text-amber-800 hover:bg-amber-100' : 'bg-gray-100 text-gray-600 hover:bg-gray-100'}>
+                              <MessageSquare className="w-3 h-3 mr-1" />
+                              {propertyInquiries.length} {propertyInquiries.length === 1 ? 'inquiry' : 'inquiries'}
+                              {pendingCount > 0 && (
+                                <span className="ml-1 bg-amber-500 text-white text-xs rounded-full px-1.5 py-px">
+                                  {pendingCount} new
+                                </span>
+                              )}
+                            </Badge>
+                          );
+                        })()}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <div>
                         <p className="text-sm text-gray-600">Monthly Rent</p>
                         <p className="text-lg font-semibold text-gray-900">
@@ -180,9 +197,17 @@ export function OwnerDashboard() {
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600">Status</p>
+                        <p className="text-sm text-gray-600">Plan</p>
                         <p className="text-lg font-semibold text-gray-900 capitalize">
-                          {property.paymentStatus}
+                          {property.planType ?? 'free'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 flex items-center gap-1">
+                          <Eye className="w-3.5 h-3.5" /> Views
+                        </p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {(property.viewCount ?? 0).toLocaleString()}
                         </p>
                       </div>
                     </div>
@@ -206,6 +231,16 @@ export function OwnerDashboard() {
                         >
                           <RefreshCw className="w-4 h-4 mr-1" />
                           Renew Listing
+                        </Button>
+                      )}
+                      {property.status === 'active' && property.planType !== 'premium' && (
+                        <Button
+                          size="sm"
+                          onClick={() => navigate('/payment/' + property.id)}
+                          className="bg-amber-500 hover:bg-amber-600 text-white"
+                        >
+                          <ArrowUpCircle className="w-4 h-4 mr-1" />
+                          {property.planType === 'featured' ? 'Upgrade to Premium' : 'Upgrade Plan'}
                         </Button>
                       )}
                       <Button

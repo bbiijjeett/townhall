@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, BedDouble, IndianRupee, Phone, MessageCircle, CheckCircle2, ChevronLeft, ChevronRight, Share2, Sparkles } from 'lucide-react';
+import { MapPin, BedDouble, IndianRupee, Phone, MessageCircle, CheckCircle2, ChevronLeft, ChevronRight, Share2, Sparkles, Flag } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../../lib/supabase';
@@ -14,6 +14,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { BuyCreditsDialog } from '../components/BuyCreditsDialog';
+import { ReportListingDialog } from '../components/ReportListingDialog';
 import { toast } from 'sonner';
 
 export function PropertyDetailPage() {
@@ -28,6 +29,7 @@ export function PropertyDetailPage() {
   const [isRevealingPhone, setIsRevealingPhone] = useState(false);
   const [revealsUsed, setRevealsUsed]         = useState<number | null>(null);
   const [showBuyCredits, setShowBuyCredits] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [enquiryName, setEnquiryName]           = useState(user?.name ?? '');
   const [enquiryMessage, setEnquiryMessage]     = useState('');
   const [isSubmittingInquiry, setIsSubmittingInquiry] = useState(false);
@@ -465,6 +467,20 @@ export function PropertyDetailPage() {
                   </div>
                 </div>
                 </> )} {/* end owner check */}
+
+              {/* Report this listing — only for non-owners when logged in */}
+              {user && user.id !== property.ownerId && (
+                <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowReport(true)}
+                    className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <Flag className="w-3 h-3" />
+                    Report this listing
+                  </button>
+                </div>
+              )}
               </Card>
 
               
@@ -477,6 +493,12 @@ export function PropertyDetailPage() {
         open={showBuyCredits}
         onOpenChange={setShowBuyCredits}
         onSuccess={handleCreditsSuccess}
+      />
+
+      <ReportListingDialog
+        propertyId={propertyId ?? ''}
+        open={showReport}
+        onOpenChange={setShowReport}
       />
 
       {/* Enquiry Form Dialog */}

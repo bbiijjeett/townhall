@@ -17,6 +17,7 @@ import { SavedPropertiesPage } from './pages/SavedPropertiesPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { TermsOfServicePage } from './pages/TermsOfServicePage';
 import { CookiePolicyPage } from './pages/CookiePolicyPage';
+import AdminPage from './pages/AdminPage';
 import { Toaster } from './components/ui/sonner';
 
 export default function App() {
@@ -49,6 +50,9 @@ export default function App() {
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route path="/terms-of-service" element={<TermsOfServicePage />} />
             <Route path="/cookie-policy" element={<CookiePolicyPage />} />
+            <Route path="/admin" element={
+              <ProtectedRoute><AdminPage /></ProtectedRoute>
+            } />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </div>
