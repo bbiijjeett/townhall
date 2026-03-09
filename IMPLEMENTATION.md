@@ -223,20 +223,20 @@ Before checking off any task:
 ## Part 11 — Listing Reports (Trust & Safety)
 > Depends on: Part 1 (listing_reports table)
 
-- [ ] Add "Report this listing" link/button to `PropertyDetailPage` (small, below fold)
-- [ ] Report modal — dropdown for reason (`Fake listing / Duplicate / Wrong price / Offensive / Other`) + optional description. On submit: `INSERT INTO listing_reports`. Rate-limit: use Upstash Redis key `report:{property_id}:{user_id}` with 7-day TTL to prevent spam
-- [ ] **Admin view** — simple `/admin` protected route (role check: `is_verified_owner` or a separate `is_admin` flag). Table view of unresolved `listing_reports` with "Mark resolved" + "Flag listing" actions
+- [x] Add "Report this listing" link/button to `PropertyDetailPage` (small, below fold)
+- [x] Report modal — dropdown for reason (`Fake listing / Duplicate / Wrong price / Offensive / Other`) + optional description. On submit: `INSERT INTO listing_reports`. Rate-limit: use Upstash Redis key `report:{property_id}:{user_id}` with 7-day TTL to prevent spam
+- [x] **Admin view** — simple `/admin` protected route (role check: `is_verified_owner` or a separate `is_admin` flag). Table view of unresolved `listing_reports` with "Mark resolved" + "Flag listing" actions
 
 ---
 
 ## Part 12 — Owner Dashboard Upgrades
 > Depends on: Part 4 (inquiries), Part 6 (expiry), Part 7 (plans)
 
-- [ ] Add **view count sparkline** per listing (7-day rolling, or total `view_count` if realtime data not collected)
-- [ ] Add **inquiry count badge** per listing (count from `inquiries` table)
-- [ ] Add **days remaining badge** — `expires_at - now()` shown as "12 days left" with color: green > 14d, amber 7–14d, red < 7d
-- [ ] Add **"Upgrade Plan" CTA** on free listings in dashboard — links to plan selection for that listing
-- [ ] Add **"Renew" CTA** on expired listings — links to plan selection with listing pre-selected
+- [x] Add **view count sparkline** per listing (7-day rolling, or total `view_count` if realtime data not collected)
+- [x] Add **inquiry count badge** per listing (count from `inquiries` table)
+- [x] Add **days remaining badge** — `expires_at - now()` shown as "12 days left" with color: green > 14d, amber 7–14d, red < 7d
+- [x] Add **"Upgrade Plan" CTA** on free listings in dashboard — links to plan selection for that listing
+- [x] Add **"Renew" CTA** on expired listings — links to plan selection with listing pre-selected
 
 ---
 

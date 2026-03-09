@@ -18,6 +18,7 @@ export interface Property {
   status: 'pending' | 'active' | 'expired' | 'flagged';
   paymentStatus: 'pending' | 'paid';
   planType?: 'free' | 'featured' | 'premium';
+  ownerAccountType?: 'owner' | 'agent';
   createdAt: Date;
   expiresAt: Date;
   // Additional fields
@@ -51,6 +52,7 @@ export interface Profile {
   reveal_credits: number;
   reveal_unlimited: boolean;
   is_verified_owner: boolean;
+  account_type: 'owner' | 'agent';
   created_at: string;
 }
 
@@ -94,7 +96,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('properties')
-        .select('*')
+        .select('*, profiles!owner_id(account_type)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -121,6 +123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           longitude: p.longitude,
           viewCount: p.view_count ?? 0,
           planType: p.plan_type as 'free' | 'featured' | 'premium' | undefined,
+          ownerAccountType: ((p.profiles as { account_type?: string } | null)?.account_type ?? 'owner') as 'owner' | 'agent',
           ownerId: p.owner_id,
           ownerName: p.owner_name,
           status: p.status,

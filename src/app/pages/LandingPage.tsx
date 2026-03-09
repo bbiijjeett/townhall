@@ -112,7 +112,7 @@ export function LandingPage() {
             Find Your Perfect <span className="text-indigo-400">Home</span>
           </h1>
           <p className="text-lg text-indigo-200 mb-8 max-w-2xl mx-auto">
-            Discover verified rental properties in your town. No broker fees. Direct owner contact.
+            Always know who you're talking to.
           </p>
 
           {/* Modern Search Bar */}

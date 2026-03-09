@@ -10,6 +10,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { toast } from 'sonner';
 
 type Role = 'tenant' | 'owner' | 'both';
+type AccountType = 'owner' | 'agent';
 
 const BHK_OPTIONS = ['1BHK', '2BHK', '3BHK', '4BHK+'];
 
@@ -25,6 +26,7 @@ export function WelcomePage() {
 
   const [step, setStep]             = useState(1);
   const [role, setRole]             = useState<Role | null>(null);
+  const [accountType, setAccountType] = useState<AccountType>('owner');
   const [city, setCity]             = useState('');
   const [phone, setPhone]           = useState('');
   const [bhkFilters, setBhkFilters] = useState<string[]>([]);
@@ -77,6 +79,7 @@ export function WelcomePage() {
           role,
           city: city.trim(),
           phone: phoneDigits.length >= 10 ? phoneDigits : null,
+          account_type: role === 'tenant' ? 'owner' : accountType,
           onboarding_complete: true,
         })
         .eq('id', user.id);
@@ -138,6 +141,7 @@ export function WelcomePage() {
 
           {/* ── Step 1: Role ── */}
           {step === 1 && (
+            <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {(['tenant', 'owner', 'both'] as Role[]).map((r) => (
                 <button
@@ -164,6 +168,37 @@ export function WelcomePage() {
                 </button>
               ))}
             </div>
+
+            {/* Account type picker — only for owners/both */}
+            {role !== null && role !== 'tenant' && (
+              <div className="mt-5 space-y-2">
+                <p className="text-sm font-semibold text-gray-700">I'm listing as a…</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {(['owner', 'agent'] as AccountType[]).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setAccountType(t)}
+                      className={`p-3 rounded-xl border-2 text-center transition-all ${
+                        accountType === t
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                          : 'border-gray-200 hover:border-indigo-300 text-gray-700'
+                      }`}
+                    >
+                      <div className="text-xl mb-1">{t === 'owner' ? '🏠' : '💼'}</div>
+                      <p className="font-semibold">{t === 'owner' ? 'Direct Owner' : 'Property Agent'}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {t === 'owner' ? 'I own this property' : 'I represent the owner'}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 pt-1">
+                  Agents can list freely — but must declare it. Tenants always know who they're talking to.
+                </p>
+              </div>
+            )}
+            </>
           )}
 
           {/* ── Step 2: City ── */}

@@ -34,8 +34,11 @@ function freshnessScore(property: Property): number {
 
 // ─── 2. Paid Boost (0 – 30 pts) ──────────────────────────────────────────────
 // Premium > Featured > Free/unpaid so paid tiers surface above each other.
+// Agents are ranked-capped at +10 regardless of plan — they can pay to list,
+// but they can never outrank a verified owner at the top of results.
 function paidBoostScore(property: Property): number {
   if (property.paymentStatus !== 'paid') return 0;
+  if (property.ownerAccountType === 'agent') return 10; // agents always capped
   if (property.planType === 'premium')  return 30;
   if (property.planType === 'featured') return 20;
   return 10; // free paid tier
