@@ -456,15 +456,20 @@ export function PropertyDetailPage() {
                   </Button>
                 </div>
 
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <div className="flex items-center space-x-2 text-sm text-gray-600 mb-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                    <span>No Broker Fee</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                    <span>Direct Owner Contact</span>
-                  </div>
+                <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Move-In Checklist</p>
+                  {[
+                    'Verify owner ID before signing',
+                    'Get rental agreement before paying',
+                    'Document existing damage with photos',
+                    'Confirm deposit refund terms in writing',
+                    'Check water, power & gas connections',
+                  ].map((item) => (
+                    <div key={item} className="flex items-start space-x-2 text-sm text-gray-600">
+                      <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
                 </div>
                 </> )} {/* end owner check */}
 
