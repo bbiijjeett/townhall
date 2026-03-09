@@ -25,7 +25,7 @@ const FURNISHING_OPTIONS = ['Fully Furnished', 'Semi Furnished', 'Unfurnished'];
 export function FilterBar({ onFilterChange }: FilterBarProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [bhk, setBhk] = useState<string[]>([]);
-  const [rentRange, setRentRange] = useState<[number, number]>([0, 25000]);
+  const [rentRange, setRentRange] = useState<[number, number]>([0, 100000]);
   const [furnishing, setFurnishing] = useState<string[]>([]);
   const [amenities, setAmenities] = useState<string[]>([]);
 
@@ -62,13 +62,13 @@ export function FilterBar({ onFilterChange }: FilterBarProps) {
 
   const clearFilters = () => {
     setBhk([]);
-    setRentRange([0, 25000]);
+    setRentRange([0, 100000]);
     setFurnishing([]);
     setAmenities([]);
-    onFilterChange({ bhk: [], rentRange: [0, 25000], furnishing: [], amenities: [] });
+    onFilterChange({ bhk: [], rentRange: [0, 100000], furnishing: [], amenities: [] });
   };
 
-  const hasActiveFilters = bhk.length > 0 || furnishing.length > 0 || amenities.length > 0 || rentRange[0] > 0 || rentRange[1] < 25000;
+  const hasActiveFilters = bhk.length > 0 || furnishing.length > 0 || amenities.length > 0 || rentRange[0] > 0 || rentRange[1] < 100000;
 
   return (
     <div className="space-y-3">
@@ -120,7 +120,7 @@ export function FilterBar({ onFilterChange }: FilterBarProps) {
               value={rentRange}
               onValueChange={handleRentRangeChange}
               min={0}
-              max={25000}
+              max={100000}
               step={1000}
               className="w-full"
             />

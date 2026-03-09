@@ -19,7 +19,7 @@ export function LandingPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<FilterOptions>({
     bhk: [],
-    rentRange: [0, 25000],
+    rentRange: [0, 100000],
     furnishing: [],
     amenities: [],
   });

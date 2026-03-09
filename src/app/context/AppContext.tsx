@@ -96,7 +96,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('properties')
-        .select('*, profiles!owner_id(account_type)')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -123,7 +123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           longitude: p.longitude,
           viewCount: p.view_count ?? 0,
           planType: p.plan_type as 'free' | 'featured' | 'premium' | undefined,
-          ownerAccountType: ((p.profiles as { account_type?: string } | null)?.account_type ?? 'owner') as 'owner' | 'agent',
+          ownerAccountType: (p.owner_account_type ?? 'owner') as 'owner' | 'agent',
           ownerId: p.owner_id,
           ownerName: p.owner_name,
           status: p.status,
@@ -225,6 +225,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         owner_id: user.id,
         owner_name: property.ownerName || user.name,
         owner_phone: profile?.phone ?? null,
+        owner_account_type: profile?.account_type ?? 'owner',
         status: 'pending',
         payment_status: 'pending',
         expires_at: expiresAt.toISOString(),
