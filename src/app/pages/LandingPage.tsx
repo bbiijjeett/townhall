@@ -10,7 +10,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
-import heroBg from '../../assets/hero.png';
+const heroBg = 'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1920&q=80';
 
 export function LandingPage() {
   const navigate = useNavigate();
@@ -98,13 +98,13 @@ export function LandingPage() {
       <div className="relative overflow-hidden bg-gray-900 text-white min-h-[500px] flex flex-col justify-center">
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
-          <img 
-            src={heroBg} 
-            alt="Hero Background" 
-            className="w-full h-full object-cover"
+          <img
+            src={heroBg}
+            alt="Modern city skyline"
+            className="w-full h-full object-cover object-center"
           />
-          {/* Overlay to ensure text readability */}
-          <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-[2px]"></div>
+          {/* Dark gradient overlay for sharp contrast + readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-gray-900/60 via-gray-900/50 to-gray-900/70" />
         </div>
 
         <div className="relative z-10 max-w-4xl mx-auto px-4 py-16 sm:px-6 lg:px-8 text-center">
@@ -115,18 +115,31 @@ export function LandingPage() {
             Always know who you're talking to.
           </p>
 
-          {/* Modern Search Bar */}
-          <div className="relative max-w-2xl mx-auto transform transition-all hover:scale-[1.01] duration-200">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-gray-400" />
+          {/* Polished Search Bar */}
+          <div className="relative max-w-2xl mx-auto transition-transform hover:scale-[1.01] duration-200">
+            {/* Glow ring on focus */}
+            <div className="absolute -inset-0.5 rounded-full bg-indigo-400/30 blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
+            <div className="relative flex items-center bg-white rounded-full shadow-[0_8px_40px_rgba(0,0,0,0.18)] overflow-hidden">
+              <div className="pl-5 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-indigo-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search by location, landmark, or property..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 pl-3 pr-5 py-4 bg-transparent text-gray-900 placeholder-gray-400 text-base border-0 outline-none focus:outline-none focus:ring-0 caret-indigo-500"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="pr-5 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Clear search"
+                >
+                  ✕
+                </button>
+              )}
             </div>
-            <input
-              type="text"
-              placeholder="Search by location, landmark, or property..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-11 pr-4 py-4 bg-white text-gray-900 placeholder-gray-500 rounded-full shadow-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-lg"
-            />
           </div>
 
           {/* Modern Category Pills */}
@@ -201,7 +214,7 @@ export function LandingPage() {
               className="mt-4"
               onClick={() => {
                 setSearchQuery('');
-                setFilters({ bhk: [], rentRange: [0, 25000], furnishing: [], amenities: [] });
+                setFilters({ bhk: [], rentRange: [0, 100000], furnishing: [], amenities: [] });
                 setSelectedCategory(null);
               }}
             >
