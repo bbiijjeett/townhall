@@ -16,10 +16,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import { toast } from 'sonner';
 
 interface PropertyFormData {
+  propertyCategory: 'residential' | 'commercial';
   title: string;
   rent: string;
   deposit: string;
   bhk: string;
+  commercialType: 'Office Space' | 'Shop' | 'Showroom' | 'Warehouse' | 'Coworking' | 'Other';
   street1: string;
   street2: string;
   nearby: string;
@@ -35,20 +37,36 @@ interface PropertyFormData {
   furnishing: 'Fully Furnished' | 'Semi Furnished' | 'Unfurnished';
   preferredTenants: 'Family' | 'Bachelor' | 'Any';
   isPetFriendly: boolean;
+  maintenanceCharges: string;
+  parkingSpots: string;
+  powerLoad: string;
+  lockInPeriod: string;
   latitude?: number;
   longitude?: number;
 }
 
 const STEPS = [
-  { id: 1, title: 'Basic Info', description: 'Property details' },
-  { id: 2, title: 'Location', description: 'Where is it?' },
-  { id: 3, title: 'Pricing', description: 'Set your price' },
-  { id: 4, title: 'Photos', description: 'Add images' },
-  { id: 5, title: 'Amenities', description: 'Facilities' },
-  { id: 6, title: 'Review', description: 'Preview & submit' },
+  { id: 1, title: 'Type', description: 'Category' },
+  { id: 2, title: 'Basic Info', description: 'Property details' },
+  { id: 3, title: 'Location', description: 'Where is it?' },
+  { id: 4, title: 'Pricing', description: 'Set your price' },
+  { id: 5, title: 'Photos', description: 'Add images' },
+  { id: 6, title: 'Amenities', description: 'Facilities' },
+  { id: 7, title: 'Review', description: 'Preview & submit' },
 ];
 
-const DRAFT_KEY = 'propertyDraft';
+const RESIDENTIAL_AMENITIES = [
+  'Parking', 'WiFi', 'AC', 'Power Backup', 'Water Supply', 'Furnished',
+  'Gym', 'Swimming Pool', 'Garden', 'Security', 'Elevator', 'Refrigerator',
+];
+
+const COMMERCIAL_AMENITIES = [
+  'Parking', 'Power Backup', 'WiFi', 'CCTV', 'Lift', 'AC',
+  'Fire Safety', 'Reception', 'Pantry', 'Conference Room',
+  '24/7 Access', 'Security Guard',
+];
+
+const DRAFT_KEY = 'propertyDraft_v2';
 
 export function AddPropertyPage() {
   const navigate = useNavigate();
@@ -60,10 +78,12 @@ export function AddPropertyPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState<PropertyFormData>({
+    propertyCategory: 'residential',
     title: '',
     rent: '',
     deposit: '',
     bhk: '1BHK',
+    commercialType: 'Office Space',
     street1: '',
     street2: '',
     nearby: '',
@@ -79,6 +99,10 @@ export function AddPropertyPage() {
     furnishing: 'Semi Furnished',
     preferredTenants: 'Any',
     isPetFriendly: false,
+    maintenanceCharges: '',
+    parkingSpots: '',
+    powerLoad: '',
+    lockInPeriod: '',
   });
 
   // Load draft from localStorage
@@ -182,12 +206,16 @@ export function AddPropertyPage() {
     e.target.value = '';
   };
 
-  const availableAmenities = [
-    'Parking', 'WiFi', 'AC', 'Power Backup', 'Water Supply', 'Furnished',
-    'Gym', 'Swimming Pool', 'Garden', 'Security', 'Elevator', 'Refrigerator',
-  ];
+  const isCommercial = formData.propertyCategory === 'commercial';
+  const activeAmenities = isCommercial ? COMMERCIAL_AMENITIES : RESIDENTIAL_AMENITIES;
 
-  const updateField = (field: keyof PropertyFormData, value: any) => {
+  const breadcrumb = (() => {
+    const cat = isCommercial ? 'Commercial' : 'Residential';
+    const sub = isCommercial ? formData.commercialType : formData.bhk;
+    return sub ? `${cat} › ${sub}` : cat;
+  })();
+
+  const updateField = (field: keyof PropertyFormData, value: unknown) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -210,6 +238,12 @@ export function AddPropertyPage() {
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
+        if (!formData.propertyCategory) {
+          toast.error('Please select a property category');
+          return false;
+        }
+        return true;
+      case 2:
         if (!formData.title.trim()) {
           toast.error('Please enter a property title');
           return false;
@@ -218,8 +252,12 @@ export function AddPropertyPage() {
           toast.error('Please provide the owner name');
           return false;
         }
+        if (isCommercial && !formData.area.trim()) {
+          toast.error('Area is required for commercial properties');
+          return false;
+        }
         return true;
-      case 2:
+      case 3:
         if (!formData.street1.trim()) {
           toast.error('Please enter street address');
           return false;
@@ -229,7 +267,7 @@ export function AddPropertyPage() {
           return false;
         }
         return true;
-      case 3:
+      case 4:
         if (!formData.rent || Number(formData.rent) <= 0) {
           toast.error('Please enter a valid rent amount');
           return false;
@@ -238,14 +276,18 @@ export function AddPropertyPage() {
           toast.error('Please enter a valid deposit amount');
           return false;
         }
+        if (formData.maintenanceCharges && Number(formData.maintenanceCharges) <= 0) {
+          toast.error('Maintenance charges must be greater than 0');
+          return false;
+        }
         return true;
-      case 4:
+      case 5:
         if (formData.imageUrls.length === 0) {
           toast.error('Please add at least one property image');
           return false;
         }
         return true;
-      case 5:
+      case 6:
         if (!formData.description.trim() || formData.description.length < 20) {
           toast.error('Please provide a detailed description (at least 20 characters)');
           return false;
@@ -282,7 +324,7 @@ export function AddPropertyPage() {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(5)) return;
+    if (!validateStep(6)) return;
 
     try {
       setIsSubmitting(true);
@@ -295,16 +337,33 @@ export function AddPropertyPage() {
         formData.city.trim()
       ].filter(Boolean);
       const fullLocation = locationParts.join(', ');
+
+      // For commercial: encode extra fields into amenities tags and description suffix
+      let finalAmenities = [...formData.amenities];
+      let finalDescription = formData.description.trim();
+      if (isCommercial) {
+        if (formData.parkingSpots) finalAmenities = [...finalAmenities, `Parking: ${formData.parkingSpots} spots`];
+        if (formData.powerLoad) finalAmenities = [...finalAmenities, `Power: ${formData.powerLoad} kW`];
+        if (formData.lockInPeriod) {
+          finalDescription += `\n\nLock-in Period: ${formData.lockInPeriod} month(s).`;
+        }
+        if (formData.maintenanceCharges) {
+          finalDescription += `\nMonthly Maintenance: ₹${Number(formData.maintenanceCharges).toLocaleString()}.`;
+        }
+      }
+
+      // For commercial, bhk field holds the commercial type (schema-compatible)
+      const bhkValue = isCommercial ? formData.commercialType : formData.bhk;
       
       const propertyId = await addProperty({
         title: formData.title.trim(),
         rent: Number(formData.rent),
         deposit: Number(formData.deposit),
-        bhk: formData.bhk,
+        bhk: bhkValue,
         location: fullLocation,
-        description: formData.description.trim(),
+        description: finalDescription,
         images: formData.imageUrls,
-        amenities: formData.amenities,
+        amenities: finalAmenities,
         ownerName: formData.ownerName.trim(),
         area: formData.area ? Number(formData.area) : undefined,
         floor: formData.floor ? Number(formData.floor) : undefined,
@@ -329,7 +388,52 @@ export function AddPropertyPage() {
 
   const renderStep = () => {
     switch (currentStep) {
+      // ── Step 1: Property Category ────────────────────────────────────────────
       case 1:
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-gray-900">What are you listing?</h3>
+              <p className="text-gray-500 mt-1 text-sm">Choose the property category to get started</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+              {([
+                { value: 'residential', icon: '🏠', label: 'Residential', sub: 'Flat, Apartment, Villa, Studio' },
+                { value: 'commercial',  icon: '🏢', label: 'Commercial',  sub: 'Office, Shop, Showroom, Warehouse' },
+              ] as const).map(({ value, icon, label, sub }) => {
+                const selected = formData.propertyCategory === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      updateField('propertyCategory', value);
+                      // Reset amenities when switching category
+                      updateField('amenities', []);
+                    }}
+                    className={`w-full rounded-xl border-2 p-6 text-left transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      selected
+                        ? 'border-indigo-600 bg-indigo-50 shadow-md'
+                        : 'border-gray-200 bg-white hover:border-indigo-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="text-4xl mb-3">{icon}</div>
+                    <p className={`text-lg font-bold ${selected ? 'text-indigo-700' : 'text-gray-900'}`}>{label}</p>
+                    <p className="text-sm text-gray-500 mt-1">{sub}</p>
+                    {selected && (
+                      <span className="inline-flex items-center gap-1 mt-3 text-xs font-semibold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
+                        <Check className="w-3 h-3" /> Selected
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+      // ── Step 2: Basic Info ───────────────────────────────────────────────────
+      case 2:
         return (
           <div className="space-y-6">
             <div>
@@ -338,31 +442,55 @@ export function AddPropertyPage() {
                 id="title"
                 value={formData.title}
                 onChange={(e) => updateField('title', e.target.value)}
-                placeholder="e.g., Spacious 2BHK Near City Center"
+                placeholder={isCommercial ? 'e.g., Prime Office Space in Koramangala' : 'e.g., Spacious 2BHK Near City Center'}
                 className="mt-1"
               />
             </div>
 
-            <div>
-              <Label>BHK Type *</Label>
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {['1BHK', '2BHK', '3BHK', '4BHK'].map((type) => (
-                  <Button
-                    key={type}
-                    type="button"
-                    variant={formData.bhk === type ? 'default' : 'outline'}
-                    onClick={() => updateField('bhk', type)}
-                    className={formData.bhk === type ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
-                  >
-                    {type}
-                  </Button>
-                ))}
+            {/* BHK selector — residential only */}
+            {!isCommercial && (
+              <div>
+                <Label>BHK Type *</Label>
+                <div className="grid grid-cols-5 gap-2 mt-2">
+                  {['1BHK', '2BHK', '3BHK', '4BHK+', 'Studio'].map((type) => (
+                    <Button
+                      key={type}
+                      type="button"
+                      variant={formData.bhk === type ? 'default' : 'outline'}
+                      onClick={() => updateField('bhk', type)}
+                      className={formData.bhk === type ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
+                    >
+                      {type}
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
+            {/* Commercial Type selector */}
+            {isCommercial && (
+              <div>
+                <Label>Commercial Type *</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                  {(['Office Space', 'Shop', 'Showroom', 'Warehouse', 'Coworking', 'Other'] as const).map((type) => (
+                    <Button
+                      key={type}
+                      type="button"
+                      variant={formData.commercialType === type ? 'default' : 'outline'}
+                      onClick={() => updateField('commercialType', type)}
+                      className={formData.commercialType === type ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
+                    >
+                      {type}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Area — required for commercial, optional for residential */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="area">Area (sq ft)</Label>
+                <Label htmlFor="area">Area (sq ft){isCommercial ? ' *' : ''}</Label>
                 <Input
                   id="area"
                   type="number"
@@ -372,158 +500,132 @@ export function AddPropertyPage() {
                   className="mt-1"
                 />
               </div>
-              <div>
-                <Label htmlFor="furnishing">Furnishing Status</Label>
-                <select
-                  id="furnishing"
-                  value={formData.furnishing}
-                  onChange={(e) => updateField('furnishing', e.target.value)}
-                  className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option>Fully Furnished</option>
-                  <option>Semi Furnished</option>
-                  <option>Unfurnished</option>
-                </select>
-              </div>
+              {!isCommercial && (
+                <div>
+                  <Label htmlFor="furnishing">Furnishing Status</Label>
+                  <select
+                    id="furnishing"
+                    value={formData.furnishing}
+                    onChange={(e) => updateField('furnishing', e.target.value)}
+                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                  >
+                    <option>Fully Furnished</option>
+                    <option>Semi Furnished</option>
+                    <option>Unfurnished</option>
+                  </select>
+                </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="floor">Floor</Label>
-                <Input
-                  id="floor"
-                  type="number"
-                  value={formData.floor}
-                  onChange={(e) => updateField('floor', e.target.value)}
-                  placeholder="3"
-                  className="mt-1"
-                />
+            {/* Floor info — residential only */}
+            {!isCommercial && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="floor">Floor</Label>
+                  <Input id="floor" type="number" value={formData.floor}
+                    onChange={(e) => updateField('floor', e.target.value)} placeholder="3" className="mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="totalFloors">Total Floors</Label>
+                  <Input id="totalFloors" type="number" value={formData.totalFloors}
+                    onChange={(e) => updateField('totalFloors', e.target.value)} placeholder="5" className="mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="availableFrom">Available From</Label>
+                  <Input id="availableFrom" type="date" value={formData.availableFrom}
+                    onChange={(e) => updateField('availableFrom', e.target.value)} className="mt-1" />
+                </div>
               </div>
-              <div>
-                <Label htmlFor="totalFloors">Total Floors</Label>
-                <Input
-                  id="totalFloors"
-                  type="number"
-                  value={formData.totalFloors}
-                  onChange={(e) => updateField('totalFloors', e.target.value)}
-                  placeholder="5"
-                  className="mt-1"
-                />
+            )}
+
+            {/* Commercial-only fields */}
+            {isCommercial && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="parkingSpots">Parking Spots</Label>
+                  <Input id="parkingSpots" type="number" value={formData.parkingSpots}
+                    onChange={(e) => updateField('parkingSpots', e.target.value)} placeholder="e.g., 5" className="mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="powerLoad">Power Load (kW)</Label>
+                  <Input id="powerLoad" type="number" value={formData.powerLoad}
+                    onChange={(e) => updateField('powerLoad', e.target.value)} placeholder="e.g., 10" className="mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="lockInPeriod">Lock-in Period (months)</Label>
+                  <Input id="lockInPeriod" type="number" value={formData.lockInPeriod}
+                    onChange={(e) => updateField('lockInPeriod', e.target.value)} placeholder="e.g., 12" className="mt-1" />
+                </div>
               </div>
-              <div>
-                <Label htmlFor="availableFrom">Available From</Label>
-                <Input
-                  id="availableFrom"
-                  type="date"
-                  value={formData.availableFrom}
-                  onChange={(e) => updateField('availableFrom', e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-            </div>
+            )}
 
             <div>
               <Label htmlFor="ownerName">Owner Name *</Label>
-              <Input
-                id="ownerName"
-                type="text"
-                value={formData.ownerName}
+              <Input id="ownerName" type="text" value={formData.ownerName}
                 onChange={(e) => updateField('ownerName', e.target.value)}
-                placeholder="Enter your full name"
-                className="mt-1"
-              />
+                placeholder="Enter your full name" className="mt-1" />
             </div>
 
-            <div>
-              <Label htmlFor="preferredTenants">Preferred Tenants</Label>
-              <select
-                id="preferredTenants"
-                value={formData.preferredTenants}
-                onChange={(e) => updateField('preferredTenants', e.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-              >
-                <option>Any</option>
-                <option>Family</option>
-                <option>Bachelor</option>
-              </select>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="petFriendly"
-                checked={formData.isPetFriendly}
-                onCheckedChange={(checked) => updateField('isPetFriendly', checked)}
-              />
-              <Label htmlFor="petFriendly" className="cursor-pointer">
-                Pet Friendly
-              </Label>
-            </div>
+            {/* Residential-only preferences */}
+            {!isCommercial && (
+              <>
+                <div>
+                  <Label htmlFor="preferredTenants">Preferred Tenants</Label>
+                  <select id="preferredTenants" value={formData.preferredTenants}
+                    onChange={(e) => updateField('preferredTenants', e.target.value)}
+                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">
+                    <option>Any</option>
+                    <option>Family</option>
+                    <option>Bachelor</option>
+                  </select>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="petFriendly" checked={formData.isPetFriendly}
+                    onCheckedChange={(checked) => updateField('isPetFriendly', checked)} />
+                  <Label htmlFor="petFriendly" className="cursor-pointer">Pet Friendly</Label>
+                </div>
+              </>
+            )}
           </div>
         );
 
-      case 2:
+      // ── Step 3: Location ─────────────────────────────────────────────────────
+      case 3:
         return (
           <div className="space-y-6">
             <div>
               <Label htmlFor="street1">Street Address Line 1 *</Label>
               <div className="relative mt-1">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  id="street1"
-                  value={formData.street1}
+                <Input id="street1" value={formData.street1}
                   onChange={(e) => updateField('street1', e.target.value)}
-                  placeholder="e.g., Building Name, Street Name"
-                  className="pl-10"
-                />
+                  placeholder="e.g., Building Name, Street Name" className="pl-10" />
               </div>
             </div>
-
             <div>
               <Label htmlFor="street2">Street Address Line 2 (Optional)</Label>
-              <Input
-                id="street2"
-                value={formData.street2}
+              <Input id="street2" value={formData.street2}
                 onChange={(e) => updateField('street2', e.target.value)}
-                placeholder="e.g., Apartment/Floor Number, Area Name"
-                className="mt-1"
-              />
+                placeholder="e.g., Apartment/Floor Number, Area Name" className="mt-1" />
             </div>
-
             <div>
               <Label htmlFor="nearby">Nearby Landmark (Optional)</Label>
-              <Input
-                id="nearby"
-                value={formData.nearby}
+              <Input id="nearby" value={formData.nearby}
                 onChange={(e) => updateField('nearby', e.target.value)}
-                placeholder="e.g., Near Phoenix Mall, Behind City Hospital"
-                className="mt-1"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Mention nearby metro stations, bus stops, malls, or popular landmarks
-              </p>
+                placeholder="e.g., Near Phoenix Mall, Behind City Hospital" className="mt-1" />
+              <p className="text-xs text-gray-500 mt-1">Mention nearby metro stations, bus stops, malls, or popular landmarks</p>
             </div>
-
             <div>
               <Label htmlFor="city">City *</Label>
-              <Input
-                id="city"
-                value={formData.city}
+              <Input id="city" value={formData.city}
                 onChange={(e) => updateField('city', e.target.value)}
-                placeholder="e.g., Bangalore, Mumbai, Delhi"
-                className="mt-1"
-              />
+                placeholder="e.g., Bangalore, Mumbai, Delhi" className="mt-1" />
             </div>
-
             <div>
               <Label>Pin Location on Map (Optional)</Label>
               <p className="text-xs text-gray-500 mb-2">Helps tenants find the exact location</p>
               <LocationPicker
-                searchQuery={[
-                  formData.street1,
-                  formData.street2,
-                  formData.nearby,
-                  formData.city,
-                ].filter(Boolean).join(', ')}
+                searchQuery={[formData.street1, formData.street2, formData.nearby, formData.city].filter(Boolean).join(', ')}
                 latitude={formData.latitude}
                 longitude={formData.longitude}
                 onChange={(lat, lng) => {
@@ -532,56 +634,75 @@ export function AddPropertyPage() {
                 }}
               />
             </div>
-
             <div className="rounded-lg border p-6 bg-blue-50">
               <h4 className="font-medium text-blue-900 mb-2">💡 Location Tips:</h4>
               <ul className="text-sm text-blue-700 space-y-1 list-disc list-inside">
                 <li>Be specific with street address for accurate location</li>
                 <li>Landmarks help tenants find your property easily</li>
                 <li>Mention nearby metro/bus stops for better visibility</li>
-                <li>Example: "Sunshine Apartments, MG Road | Koramangala | Near Phoenix Mall | Bangalore"</li>
               </ul>
             </div>
           </div>
         );
 
-      case 3:
+      // ── Step 4: Pricing ──────────────────────────────────────────────────────
+      case 4: {
+        const rent = Number(formData.rent) || 0;
+        const maintenance = Number(formData.maintenanceCharges) || 0;
+        const totalMonthly = rent + maintenance;
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
                 <Label htmlFor="rent">Monthly Rent (₹) *</Label>
-                <Input
-                  id="rent"
-                  type="number"
-                  value={formData.rent}
-                  onChange={(e) => updateField('rent', e.target.value)}
-                  placeholder="12000"
-                  className="mt-1"
-                />
+                <Input id="rent" type="number" value={formData.rent}
+                  onChange={(e) => updateField('rent', e.target.value)} placeholder="12000" className="mt-1" />
                 {formData.rent && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    ₹{Number(formData.rent).toLocaleString()}/month
-                  </p>
+                  <p className="text-xs text-gray-600 mt-1">₹{rent.toLocaleString()}/month</p>
                 )}
               </div>
               <div>
                 <Label htmlFor="deposit">Security Deposit (₹) *</Label>
-                <Input
-                  id="deposit"
-                  type="number"
-                  value={formData.deposit}
-                  onChange={(e) => updateField('deposit', e.target.value)}
-                  placeholder="24000"
-                  className="mt-1"
-                />
+                <Input id="deposit" type="number" value={formData.deposit}
+                  onChange={(e) => updateField('deposit', e.target.value)} placeholder="24000" className="mt-1" />
                 {formData.deposit && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    ₹{Number(formData.deposit).toLocaleString()}
-                  </p>
+                  <p className="text-xs text-gray-600 mt-1">₹{Number(formData.deposit).toLocaleString()}</p>
                 )}
               </div>
             </div>
+
+            {/* Maintenance charges — shown for all, prominent for commercial */}
+            <div>
+              <Label htmlFor="maintenanceCharges">
+                Monthly Maintenance Charges (₹){isCommercial ? '' : ' — Optional'}
+              </Label>
+              <Input id="maintenanceCharges" type="number" value={formData.maintenanceCharges}
+                onChange={(e) => updateField('maintenanceCharges', e.target.value)}
+                placeholder={isCommercial ? 'e.g., 5000' : 'e.g., 2000 (optional)'} className="mt-1" />
+            </div>
+
+            {/* True Cost panel — shown when there is a maintenance value */}
+            {isCommercial && (rent > 0 || maintenance > 0) && (
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-5">
+                <p className="text-sm font-semibold text-indigo-800 mb-3">True Cost Summary</p>
+                <div className="space-y-1.5 text-sm text-indigo-700">
+                  <div className="flex justify-between">
+                    <span>Monthly Rent</span>
+                    <span className="font-medium">₹{rent.toLocaleString()}</span>
+                  </div>
+                  {maintenance > 0 && (
+                    <div className="flex justify-between">
+                      <span>Maintenance</span>
+                      <span className="font-medium">₹{maintenance.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between pt-2 border-t border-indigo-200 font-bold text-indigo-900">
+                    <span>Total Monthly Outgoing</span>
+                    <span>₹{totalMonthly.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="rounded-lg border p-6 bg-blue-50">
               <h4 className="font-medium text-blue-900 mb-2">💡 Pricing Tips:</h4>
@@ -589,34 +710,26 @@ export function AddPropertyPage() {
                 <li>Research similar properties in your area</li>
                 <li>Deposit is typically 1-3 months rent</li>
                 <li>Competitive pricing attracts more inquiries</li>
-                <li>You can always negotiate later</li>
+                {isCommercial && <li>List maintenance charges separately for transparency</li>}
               </ul>
             </div>
           </div>
         );
+      }
 
-      case 4:
+      // ── Step 5: Photos ───────────────────────────────────────────────────────
+      case 5:
         return (
           <div className="space-y-6">
             <div>
               <Label>Property Photos *</Label>
               <div className="mt-2 space-y-3">
                 <div className="flex flex-col sm:flex-row gap-2">
-                  {/* Hidden file input — triggered by the button below */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={handleFilesSelected}
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60"
-                  >
+                  <input ref={fileInputRef} type="file" multiple
+                    accept="image/jpeg,image/png,image/webp" className="hidden"
+                    onChange={handleFilesSelected} />
+                  <Button type="button" onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60">
                     {isUploading ? (
                       <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
                     ) : (
@@ -625,41 +738,33 @@ export function AddPropertyPage() {
                     {isUploading ? 'Uploading…' : 'Upload from Device'}
                   </Button>
                 </div>
-
                 <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-4">
                   <p className="font-medium mb-2">📸 Photo Guidelines:</p>
                   <ul className="list-disc list-inside space-y-1">
                     <li>Upload 3-10 high-quality photos</li>
                     <li>First photo will be the main listing image</li>
-                    <li>Show living room, bedrooms, kitchen, bathroom</li>
+                    {isCommercial
+                      ? <li>Show exterior, interiors, common areas, and parking</li>
+                      : <li>Show living room, bedrooms, kitchen, bathroom</li>}
                     <li>Good lighting and clean rooms attract more tenants</li>
                     <li>Max 5MB per image</li>
                   </ul>
                 </div>
-
                 {formData.imageUrls.length > 0 && (
                   <div>
-                    <p className="text-sm font-medium mb-2">
-                      Uploaded Photos ({formData.imageUrls.length})
-                    </p>
+                    <p className="text-sm font-medium mb-2">Uploaded Photos ({formData.imageUrls.length})</p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {formData.imageUrls.map((url, index) => (
                         <div key={index} className="relative group">
-                          <ImageWithFallback
-                            src={url}
-                            alt={`Property ${index + 1}`}
-                            className="w-full h-32 object-cover rounded-lg"
-                          />
+                          <ImageWithFallback src={url} alt={`Property ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg" />
                           {index === 0 && (
                             <div className="absolute top-2 left-2 bg-indigo-600 text-white text-xs px-2 py-1 rounded">
                               Main Photo
                             </div>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveImage(url)}
-                            className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
+                          <button type="button" onClick={() => handleRemoveImage(url)}
+                            className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                             <X className="w-3 h-3" />
                           </button>
                         </div>
@@ -672,18 +777,20 @@ export function AddPropertyPage() {
           </div>
         );
 
-      case 5:
+      // ── Step 6: Amenities + Description ─────────────────────────────────────
+      case 6:
         return (
           <div className="space-y-6">
             <div>
               <Label htmlFor="description">Property Description * (min 20 characters)</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
+              <Textarea id="description" value={formData.description}
                 onChange={(e) => updateField('description', e.target.value)}
-                placeholder="Describe your property, nearby facilities, public transport, schools, hospitals, shopping centers, etc."
-                className="mt-1 min-h-40"
-              />
+                placeholder={
+                  isCommercial
+                    ? 'Describe the space, suitable business types, nearby transport, amenities, etc.'
+                    : 'Describe your property, nearby facilities, public transport, schools, hospitals, etc.'
+                }
+                className="mt-1 min-h-40" />
               <div className="flex justify-between items-center mt-1">
                 <p className="text-xs text-gray-500">Be detailed to attract quality tenants</p>
                 <p className={`text-xs ${formData.description.length < 20 ? 'text-red-500' : 'text-green-600'}`}>
@@ -691,20 +798,14 @@ export function AddPropertyPage() {
                 </p>
               </div>
             </div>
-
             <div>
               <Label>Amenities & Facilities</Label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
-                {availableAmenities.map((amenity) => (
+                {activeAmenities.map((amenity) => (
                   <div key={amenity} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={amenity}
-                      checked={formData.amenities.includes(amenity)}
-                      onCheckedChange={() => handleAmenityToggle(amenity)}
-                    />
-                    <Label htmlFor={amenity} className="text-sm cursor-pointer">
-                      {amenity}
-                    </Label>
+                    <Checkbox id={amenity} checked={formData.amenities.includes(amenity)}
+                      onCheckedChange={() => handleAmenityToggle(amenity)} />
+                    <Label htmlFor={amenity} className="text-sm cursor-pointer">{amenity}</Label>
                   </div>
                 ))}
               </div>
@@ -712,19 +813,19 @@ export function AddPropertyPage() {
           </div>
         );
 
-      case 6:
+      // ── Step 7: Review ───────────────────────────────────────────────────────
+      case 7:
         return (
           <div className="space-y-6">
             <div className="text-center py-4">
               <h3 className="text-xl font-bold text-gray-900 mb-2">Review Your Property</h3>
               <p className="text-gray-600">Check all details before submitting</p>
             </div>
-            
             <PropertyPreview
               title={formData.title}
               rent={Number(formData.rent)}
               deposit={Number(formData.deposit)}
-              bhk={formData.bhk}
+              bhk={isCommercial ? `${formData.commercialType}${formData.area ? ` · ${Number(formData.area).toLocaleString()} sq ft` : ''}` : formData.bhk}
               location={getFullLocation()}
               description={formData.description}
               images={formData.imageUrls}
@@ -733,10 +834,9 @@ export function AddPropertyPage() {
               furnishing={formData.furnishing}
               availableFrom={formData.availableFrom ? new Date(formData.availableFrom) : undefined}
             />
-
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="text-sm text-yellow-800">
-                ℹ️ After submission, you'll be redirected to pay a listing fee of ₹199 
+                ℹ️ After submission, you'll be redirected to pay a listing fee of ₹199
                 to activate your property for 30 days.
               </p>
             </div>
@@ -768,8 +868,10 @@ export function AddPropertyPage() {
         <Card className="overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-8 text-white">
-            <h1 className="text-3xl font-bold mb-2">List Your Property</h1>
-            <p className="text-indigo-100">Fill in details step by step</p>
+            <h1 className="text-3xl font-bold mb-1">List Your Property</h1>
+            <p className="text-indigo-200 text-sm">
+              {currentStep > 1 ? breadcrumb : 'Fill in details step by step'}
+            </p>
           </div>
 
           {/* Progress Indicator */}
@@ -780,7 +882,7 @@ export function AddPropertyPage() {
                   <div key={step.id} className="flex items-center">
                     <div className="flex flex-col items-center">
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
+                        className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold transition-colors ${
                           currentStep > step.id
                             ? 'bg-green-500 text-white'
                             : currentStep === step.id
@@ -788,16 +890,16 @@ export function AddPropertyPage() {
                             : 'bg-gray-200 text-gray-500'
                         }`}
                       >
-                        {currentStep > step.id ? <Check className="w-5 h-5" /> : step.id}
+                        {currentStep > step.id ? <Check className="w-4 h-4" /> : step.id}
                       </div>
-                      <div className="text-xs mt-1 hidden sm:block text-center">
+                      <div className="text-xs mt-1 hidden md:block text-center">
                         <p className="font-medium text-gray-900">{step.title}</p>
                         <p className="text-gray-500">{step.description}</p>
                       </div>
                     </div>
                     {index < STEPS.length - 1 && (
                       <div
-                        className={`h-1 w-8 sm:w-16 mx-2 transition-colors ${
+                        className={`h-1 w-4 sm:w-10 mx-1 sm:mx-2 transition-colors ${
                           currentStep > step.id ? 'bg-green-500' : 'bg-gray-200'
                         }`}
                       />
@@ -986,7 +1088,7 @@ export function AddPropertyPage() {
             title={formData.title}
             rent={Number(formData.rent)}
             deposit={Number(formData.deposit)}
-            bhk={formData.bhk}
+            bhk={isCommercial ? `${formData.commercialType}${formData.area ? ` · ${Number(formData.area).toLocaleString()} sq ft` : ''}` : formData.bhk}
             location={getFullLocation()}
             description={formData.description}
             images={formData.imageUrls}
