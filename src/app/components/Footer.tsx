@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Home, Mail, Phone, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
+import { Home, Mail, Phone, Facebook, Instagram } from 'lucide-react';
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -15,20 +15,14 @@ export function Footer() {
               <span className="text-xl font-semibold text-white">RoingRent</span>
             </div>
             <p className="text-sm text-gray-400 mb-4">
-              Find your perfect rental home with no broker fees. Direct contact with verified property owners.
+              Find your perfect rental home. Direct contact with verified property owners.
             </p>
             <div className="flex space-x-4">
               <a href="#" className="text-gray-400 hover:text-indigo-400 transition-colors">
                 <Facebook className="w-5 h-5" />
               </a>
               <a href="#" className="text-gray-400 hover:text-indigo-400 transition-colors">
-                <Twitter className="w-5 h-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-indigo-400 transition-colors">
                 <Instagram className="w-5 h-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-indigo-400 transition-colors">
-                <Linkedin className="w-5 h-5" />
               </a>
             </div>
           </div>

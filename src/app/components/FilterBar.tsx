@@ -22,8 +22,12 @@ const AMENITY_OPTIONS = [
 
 const FURNISHING_OPTIONS = ['Fully Furnished', 'Semi Furnished', 'Unfurnished'];
 
+const RESIDENTIAL_TYPES = ['1BHK', '2BHK', '3BHK', '4BHK+', 'Studio'];
+const COMMERCIAL_TYPES  = ['Office Space', 'Shop', 'Showroom', 'Warehouse', 'Coworking', 'Other'];
+
 export function FilterBar({ onFilterChange }: FilterBarProps) {
   const [showFilters, setShowFilters] = useState(false);
+  const [typeTab, setTypeTab] = useState<'residential' | 'commercial'>('residential');
   const [bhk, setBhk] = useState<string[]>([]);
   const [rentRange, setRentRange] = useState<[number, number]>([0, 100000]);
   const [furnishing, setFurnishing] = useState<string[]>([]);
@@ -60,6 +64,15 @@ export function FilterBar({ onFilterChange }: FilterBarProps) {
     emit(bhk, newRange);
   };
 
+  const switchTypeTab = (tab: 'residential' | 'commercial') => {
+    setTypeTab(tab);
+    // Clear any type selections from the other tab
+    const currentTypes = tab === 'residential' ? COMMERCIAL_TYPES : RESIDENTIAL_TYPES;
+    const next = bhk.filter(v => !currentTypes.includes(v));
+    setBhk(next);
+    emit(next);
+  };
+
   const clearFilters = () => {
     setBhk([]);
     setRentRange([0, 100000]);
@@ -69,6 +82,7 @@ export function FilterBar({ onFilterChange }: FilterBarProps) {
   };
 
   const hasActiveFilters = bhk.length > 0 || furnishing.length > 0 || amenities.length > 0 || rentRange[0] > 0 || rentRange[1] < 100000;
+  const typeOptions = typeTab === 'residential' ? RESIDENTIAL_TYPES : COMMERCIAL_TYPES;
 
   return (
     <div className="space-y-3">
@@ -80,14 +94,15 @@ export function FilterBar({ onFilterChange }: FilterBarProps) {
         >
           <SlidersHorizontal className="w-4 h-4" />
           <span>Filters</span>
+          {hasActiveFilters && (
+            <span className="ml-1 bg-indigo-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+              {[bhk.length > 0, furnishing.length > 0, amenities.length > 0, rentRange[0] > 0 || rentRange[1] < 100000].filter(Boolean).length}
+            </span>
+          )}
         </Button>
-        
+
         {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            onClick={clearFilters}
-            className="text-sm text-indigo-600"
-          >
+          <Button variant="ghost" onClick={clearFilters} className="text-sm text-indigo-600">
             Clear All
           </Button>
         )}
@@ -95,10 +110,28 @@ export function FilterBar({ onFilterChange }: FilterBarProps) {
 
       {showFilters && (
         <Card className="p-4 space-y-6">
+          {/* Property Type with Residential / Commercial tabs */}
           <div>
-            <h3 className="font-semibold text-gray-900 mb-3">BHK Type</h3>
+            <h3 className="font-semibold text-gray-900 mb-3">Property Type</h3>
+            {/* Tab switcher */}
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden mb-3 w-fit">
+              {(['residential', 'commercial'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => switchTypeTab(tab)}
+                  className={`px-4 py-1.5 text-sm font-medium transition-colors capitalize ${
+                    typeTab === tab
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {tab === 'residential' ? '🏠 Residential' : '🏢 Commercial'}
+                </button>
+              ))}
+            </div>
+            {/* Type pills */}
             <div className="flex flex-wrap gap-2">
-              {['1BHK', '2BHK', '3BHK', '4BHK'].map((value) => (
+              {typeOptions.map((value) => (
                 <Button
                   key={value}
                   variant={bhk.includes(value) ? 'default' : 'outline'}
@@ -114,7 +147,7 @@ export function FilterBar({ onFilterChange }: FilterBarProps) {
 
           <div>
             <h3 className="font-semibold text-gray-900 mb-3">
-              Rent Range: ₹{rentRange[0].toLocaleString()} - ₹{rentRange[1].toLocaleString()}
+              Rent Range: ₹{rentRange[0].toLocaleString()} – ₹{rentRange[1].toLocaleString()}
             </h3>
             <Slider
               value={rentRange}
@@ -126,22 +159,25 @@ export function FilterBar({ onFilterChange }: FilterBarProps) {
             />
           </div>
 
-          <div>
-            <h3 className="font-semibold text-gray-900 mb-3">Furnishing</h3>
-            <div className="flex flex-wrap gap-2">
-              {FURNISHING_OPTIONS.map((value) => (
-                <Button
-                  key={value}
-                  variant={furnishing.includes(value) ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => handleFurnishingToggle(value)}
-                  className={furnishing.includes(value) ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
-                >
-                  {value}
-                </Button>
-              ))}
+          {/* Furnishing — show only for residential */}
+          {typeTab === 'residential' && (
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-3">Furnishing</h3>
+              <div className="flex flex-wrap gap-2">
+                {FURNISHING_OPTIONS.map((value) => (
+                  <Button
+                    key={value}
+                    variant={furnishing.includes(value) ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleFurnishingToggle(value)}
+                    className={furnishing.includes(value) ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
+                  >
+                    {value}
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <h3 className="font-semibold text-gray-900 mb-3">Amenities</h3>
@@ -164,3 +200,4 @@ export function FilterBar({ onFilterChange }: FilterBarProps) {
     </div>
   );
 }
+
